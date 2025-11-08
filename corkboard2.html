@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corkboard 2</title>
+    <style id="style-root">
+        :root {
+            --hover-filter: sepia(100%) hue-rotate(12deg) saturate(250%);
+            --reject-filter: sepia(100%) hue-rotate(-50deg) saturate(500%);
+            --delete-filter: brightness(70%) sepia(500%) hue-rotate(-45deg) saturate(1000%);
+            --selected-filter: brightness(90%);
+            --hover-pin-filter: sepia(70%) brightness(200%);
+            --selected-pin-filter: sepia(70%) hue-rotate(12deg) saturate(250%);
+            --selected-pin-transform: scale(105%);
+            --low-shadow-filter: drop-shadow(2px 2px #00000070);
+            --shadow-filter: drop-shadow(5px 5px #00000070);
+            --high-shadow-filter: drop-shadow(7px 7px #00000070);
+        }
+    </style><style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100vh;
+            width: 100vw;
+            margin: 0px;
+            padding: 0px;
+            overflow: hidden;
+        }
+
+        main {
+            background-image: url("Corkboard Texture.png");
+            background-size: 1024px;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        #controls {
+            position: absolute;
+            left: 15px;
+            bottom: 15px;
+            display: flex;
+            gap: 5px;
+
+            > button {
+                display: block;
+                height: 75px;
+                aspect-ratio: 1;
+                border-radius: 10px;
+                background-color: white;
+
+                > svg {
+                    width: 80%;
+                }
+            }
+
+            > button:hover {
+                filter: var(--hover-filter);
+            }
+        }
+    </style>
+    <style id="style-cards">
+        custom-card, custom-card-template, custom-card-preview {
+            position: absolute;
+            background-color: white;
+            border: 1px solid black;
+            width: 100px;
+            display: flex;
+            flex-direction: column;
+            align-content: center;
+            filter: var(--shadow-filter);
+            transform: translate(-50%, -50%);
+            padding: 2px 4px;
+            
+            *::selection {
+                background-color: #00000000;
+            }
+        }
+
+        custom-card:not(:has(custom-pin:hover)):hover, custom-card-template:hover {
+            filter: var(--shadow-filter) var(--hover-filter);
+        }
+
+        custom-card-template {
+            position: relative;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(1.5);
+        }
+
+        custom-card-preview {
+            position: absolute;
+            z-index: 10;
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+    </style>
+    <style id="style-cardStore">
+        #cardStore {
+            transition: right 300ms;
+            position: absolute;
+            top: 0;
+            right: 0;
+            height: 100%;
+            background-color: rgb(238, 243, 248);
+            border-left: 3px solid grey;
+            padding: 10px;
+            width: 20%;
+            min-width: 300px;
+
+            > .storeCard {
+                width: 100%;
+                height: 150px;
+            }
+
+            > #cardStoreToggle {
+                background-color: rgb(238, 243, 248);
+                border: none;
+                border-left: 2px solid grey;
+                border-bottom: 2px solid grey;
+                border-right: 1px solid lightgrey;
+                border-radius: 0 0 0 10px;
+                height: 40px;
+                aspect-ratio: 1;
+                position: absolute;
+                right: 100%;
+                top: 0;
+
+                > svg {    
+                    transition: rotate 300ms;
+                    rotate: 0deg;
+                    width: 80%;
+                }
+            }
+        }
+    </style>
+    <style id="style-cardEditor">
+        #cardEditor {
+            transition: right 300ms;
+            position: absolute;
+            top: 0;
+            right: -100%;
+            height: 100%;
+            background-color: rgb(238, 243, 248);
+            border-left: 3px solid grey;
+            padding: 10px;
+            width: calc(20% + 50px);
+            min-width: 350px;
+            padding-top: 0;
+
+            > ol {
+                width: 100%;
+                padding: 0;
+            }
+
+            > div {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10%;
+                padding: 0 5%;
+            }
+        }
+    </style>
+    <style id="style-sections">
+        .section {
+            display: flex;
+            width: 100%;
+            overflow: hidden;
+            align-items: center;
+        }
+
+        custom-text-section {
+            white-space: pre-wrap;
+            font-family: sans-serif;
+
+            > div {
+                flex-grow: 1;
+                vertical-align: middle;
+            }
+        }
+
+        custom-image-section {
+            > img {
+                width: 100%;
+                border: 1px solid lightgrey;
+                margin: 2px;
+            }
+        }
+    </style>
+    <style id="style-sectionEditors">
+        .sectionEditor {
+            width: 100%;
+            padding-top: 5px;
+            padding-bottom: 7px;
+            border-bottom: 2px solid rgb(192, 192, 192);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            > div {
+                width: calc(100% - 45px - 55px - 20px);
+                gap: 2%;
+            }
+        }
+
+        custom-text-section-editor {
+            > div {
+                display: flex;
+                flex-direction: column;
+
+                > textarea {
+                    resize: none;
+                }
+
+                > .textControls {
+                    display: flex;
+                    justify-content: end;
+                    gap: 2%;
+                    height: max-content;
+                    --text-control-button-size: 15px;
+
+                    .fontColorInput {
+                        width: 35px;
+                    }
+
+                    .fontColorInput, .fontSizeInput {
+                        border-radius: 5px;
+                        height: calc(var(--text-control-button-size) + 5px);
+                        margin-top: 2.5px;
+                        border-width: 1px;
+                        box-shadow: inset 1px 1px black;
+                    }
+
+                    .textStyleControls, .textAlignControls {
+                        width: max-content;
+                        margin-right: 4px;
+                        padding: 0;
+                    }
+
+                    input[type="checkbox"], input[type="radio"] {
+                        appearance: auto;
+                        -moz-appearance: initial;
+                        display: inline-block;
+                        width: var(--text-control-button-size);
+                        margin: 2px;
+                    }
+
+                    input[type="checkbox"]::after, input[type="radio"]::after {
+                        position: relative;
+                        display: inline-block;
+                        text-align: center;
+                        height: var(--text-control-button-size);
+                        width: var(--text-control-button-size);
+                        line-height: var(--text-control-button-size);
+                        font-size: calc(var(--text-control-button-size) * 0.9);
+                        padding: 2px;
+                        text-align: center;
+                        border: 1px solid grey;
+                        box-shadow: inset -1px -1px black;
+                        background-color: white;
+                    }
+
+                    input[type="checkbox"]:first-child::after, input[type="radio"]:first-child::after {
+                        border-radius: 5px 0 0 5px;
+                    }
+
+                    input[type="checkbox"]:last-child::after, input[type="radio"]:last-child::after {
+                        border-radius: 0 5px 5px 0;
+                    }
+
+                    input[type="checkbox"]:checked::after, input[type="radio"]:checked::after {
+                        filter: var(--selected-filter);
+                        box-shadow: inset 1px 1px black;
+                    }
+
+                    input[type="checkbox"]:hover::after, input[type="radio"]:hover::after {
+                        filter: var(--hover-filter);
+                    }
+
+                    .boldInput::after {
+                        content: "B";
+                        font-weight: bold;
+                    }
+
+                    .italicInput::after {
+                        content: "I";
+                        font-style: italic;
+                    }
+
+                    .underlineInput::after {
+                        content: "U";
+                        text-decoration: underline;
+                    }
+
+                    .textAlignLeftInput::after {
+                        content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' shape-rendering='crispEdges' viewBox='0 -960 960 960' fill='%23000'%3E%3Cpath d='M120-120v-80h720v80H120Zm0-160v-80h480v80H120Zm0-160v-80h720v80H120Zm0-160v-80h480v80H120Zm0-160v-80h720v80H120Z'/%3E%3C/svg%3E");
+                    }
+                    
+                    .textAlignCenterInput::after {
+                        content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' shape-rendering='crispEdges' viewBox='0 -960 960 960' fill='%23000'%3E%3Cpath d='M120-120v-80h720v80H120Zm160-160v-80h400v80H280ZM120-440v-80h720v80H120Zm160-160v-80h400v80H280ZM120-760v-80h720v80H120Z'/%3E%3C/svg%3E");
+                    }
+
+                    .textAlignRightInput::after {
+                        content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' shape-rendering='crispEdges' viewBox='0 -960 960 960' fill='%23000'%3E%3Cpath d='M120-760v-80h720v80H120Zm240 160v-80h480v80H360ZM120-440v-80h720v80H120Zm240 160v-80h480v80H360ZM120-120v-80h720v80H120Z'/%3E%3C/svg%3E");
+                    }
+                }
+            }
+        }
+
+        custom-image-section-editor {
+            > div {         
+                display: flex;
+
+                > div:first-child {
+                    width: 50px;
+                    max-height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-around;
+
+                    > img {
+                        max-width: 100%;
+                        max-height: 100%;
+                        border: 1px solid lightgrey;
+                    }
+                }
+
+                > .uploadControls {
+                    flex-grow: 1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+
+                    > input[type=file] {
+                        width: 150px;
+                        flex-grow: 1;
+                    }
+                    
+                    > input[type=reset] {
+                        width: min-content;
+                        height: min-content;
+                    }
+                }
+            }
+        }
+    </style>
+    <style id="style-pins">
+        custom-pin {
+            position: relative;
+            height: 10px;
+            aspect-ratio: 1;
+        }
+
+        custom-pin-editor {
+            position: relative;
+            height: 25px;
+            aspect-ratio: 1;
+            margin: 15px;
+        }
+
+        custom-card custom-pin:hover {
+            filter: var(--hover-pin-filter);
+            transform: scale(1.2);
+        }
+
+        custom-pin-editor:hover {
+            filter: var(--selected-pin-filter);
+            transform: var(--selected-pin-transform);
+        }
+
+        custom-pin::before {
+            height: 8px;
+            background-color: white;
+        }
+
+        custom-pin-editor::before {
+            height: 25px;
+            border: 2px solid rgb(126, 0, 0);
+        }
+
+        custom-pin::before, custom-pin-editor::before {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            display: inline-block;
+            background-color: rgb(196, 36, 36);
+            border-radius: 50%;
+            aspect-ratio: 1;
+            content: "";
+        }
+
+        custom-pin::after {
+            height: 5px;
+        }
+
+        custom-pin-editor::after {
+            height: 19px;
+        }
+
+        custom-pin::after, custom-pin-editor::after {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            display: inline-block;
+            background-color: red;
+            filter: var(--low-shadow-filter);
+            border-radius: 50%;
+            aspect-ratio: 1;
+            content: "";
+        }
+
+        custom-pin-editor.leftPin {
+            margin-left: 5px;
+        }
+
+        custom-pin-editor.rightPin {
+            margin-right: 10px;
+        }
+
+        custom-pin::before, custom-pin::after {
+            position: absolute;
+            z-index: 1;
+        }
+    </style>
+    <style id="style-sectionControls">
+        custom-section-controls {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 2px;
+
+            > button {
+                width: 20px;
+                aspect-ratio: 1;
+                padding: 0;
+
+                > svg {
+                    max-width: 100%;
+                    max-height: 100%;
+                    fill: #444;
+                }
+            }
+
+            > button:disabled > svg {
+                fill: #999;
+            }
+            
+            > .upInput > svg {
+                rotate: -90deg;
+            }
+
+            > .downInput > svg {
+                rotate: 90deg;
+            }
+        }
+    </style>
+    <style id="style-pin-strings">
+        custom-pin-string {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+
+            > svg {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+                filter: var(--low-shadow-filter);
+            }
+        }
+    </style>
+</head>
+<body>
+    <main id="main" onmousedown="handlePanStart()" onmouseup="handlePanEnd()" onmouseleave="handlePanEnd()" onmousemove="handlePan()" onwheel="handleZoom()">
+    </main>
+    <div id="controls">
+        <button id="trash">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="#555555"><path d="m376-300 104-104 104 104 56-56-104-104 104-104-56-56-104 104-104-104-56 56 104 104-104 104 56 56Zm-96 180q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520Zm-400 0v520-520Z"/></svg>
+        </button>
+        <button onclick="resetPan()">Recentre</button>
+        <button onclick="resetZoom()">Rezoom</button>
+    </div>
+    <aside id="cardStore">
+        <button id="cardStoreToggle" onclick="toggleCardStore()">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="grey"><path d="m321-80-71-71 329-329-329-329 71-71 400 400L321-80Z"/></svg>
+        </button>
+        <div class="storeCard" id="blankCard">
+            <custom-card-template></custom-card-template>
+        </div>
+        <div class="storeCard" id="personCard">
+            <custom-card-template></custom-card-template>
+        </div>
+    </aside>
+    <aside id="cardEditor">
+        <ol></ol>
+        <div>
+            <button onclick="addTextSection()">Add Text</button>
+            <button onclick="addImageSection()">Add Image</button>
+        </div>
+    </aside>
+    <template id="sectionControlsTemplate">
+        <button class="upInput">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="m321-80-71-71 329-329-329-329 71-71 400 400L321-80Z"/></svg>
+        </button>
+        <button class="deleteInput">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="m376-300 104-104 104 104 56-56-104-104 104-104-56-56-104 104-104-104-56 56 104 104-104 104 56 56Zm-96 180q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520Zm-400 0v520-520Z"/></svg>
+        </button>
+        <button class="downInput">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="m321-80-71-71 329-329-329-329 71-71 400 400L321-80Z"/></svg>
+        </button>
+    </template>
+    <template class="section" id="textSectionTemplate">
+        <custom-pin class="leftPin"></custom-pin>
+        <div></div>
+        <custom-pin class="rightPin"></custom-pin>
+    </template>
+    <template class="section" id="imageSectionTemplate">
+        <custom-pin class="leftPin"></custom-pin>
+        <img draggable="false" (dragstart)="false;">
+        <custom-pin class="rightPin"></custom-pin>
+    </template>
+    <template class="sectionEditor" id="textSectionEditorTemplate">
+        <custom-pin-editor class="leftPin"></custom-pin-editor>
+        <div>
+            <textarea class="textInput"></textarea>
+            <div class="textControls">
+                <input class="fontColorInput" name="fontColor" type="color">
+                <input class="fontSizeInput" name="fontSize" type="number">
+                <div class="textStyleControls">
+                    <input class="boldInput" name="bold" type="checkbox">
+                    <input class="italicInput" name="italic" type="checkbox">
+                    <input class="underlineInput" name="underline" type="checkbox">
+                </div>
+                <div class="textAlignControls">
+                    <input class="textAlignLeftInput" type="radio" value="left">
+                    <input class="textAlignCenterInput" type="radio" value="center">
+                    <input class="textAlignRightInput" type="radio" value="right">
+                </div>
+            </div>
+        </div>
+        <custom-pin-editor class="rightPin"></custom-pin-editor>
+        <custom-section-controls></custom-section-controls>
+    </template>
+    <template class="sectionEditor" id="imageSectionEditorTemplate">
+        <custom-pin-editor class="leftPin"></custom-pin-editor>
+        <div>
+            <div>
+                <img class="imagePreview">
+            </div>
+            <form class="uploadControls">
+                <input class="uploadInput" type="file" accept="image/*">
+                <input class="resetInput" type="reset">
+            </form>
+        </div>
+        <custom-pin-editor class="rightPin"></custom-pin-editor>
+        <custom-section-controls></custom-section-controls>
+    </template>
+    <canvas id="imageResizer" hidden></canvas>
+</body>
+<script id="script-pageNavigation">
+    var pageSettings = {
+        zoom: 1,
+        panning: false,
+        pan: {x: 0, y: 0},
+    };
+
+    const main = document.getElementById("main");
+
+    function handlePanStart() {
+        pageSettings.panning = true;
+    }
+
+    function handlePanEnd() {
+        pageSettings.panning = false;
+    }
+
+    function handlePan() {
+        if (!pageSettings.panning) return;
+
+        pageSettings.pan.x += event.movementX;
+        pageSettings.pan.y += event.movementY;
+
+        main.style.backgroundPositionX = pageSettings.pan.x + "px";
+        main.style.backgroundPositionY = pageSettings.pan.y + "px";
+
+        updateCards();
+    }
+
+    function handleZoom() {
+        if (event.deltaY < 0) {
+            pageSettings.zoom *= 1.1;
+            pageSettings.zoom = Math.min(4, pageSettings.zoom);
+        } else if (event.deltaY > 0) {
+            pageSettings.zoom /= 1.1;
+            pageSettings.zoom = Math.max(0.2, pageSettings.zoom);
+        }
+        
+        // Don't ask about the exponents, please.
+        main.style.backgroundSize = (pageSettings.zoom**0.9 * 1024) + "px " + (pageSettings.zoom**0.85 * 1024) + "px";
+
+        updateCards();
+    }
+
+    function resetPan() {
+        pageSettings.pan.x = 0;
+        pageSettings.pan.y = 0;
+        handlePan();
+    }
+
+    function resetZoom() {
+        pageSettings.zoom = 1;
+        handleZoom();
+    }
+</script>
+<script id="script-cardStore">
+    var cardStoreSettings = {
+        expanded: true,
+    };
+
+    const cardStore = document.getElementById("cardStore");
+    const cardStoreToggle = document.getElementById("cardStoreToggle");
+
+    function toggleCardStore() {
+        if (cardStoreSettings.expanded) {
+            cardStore.style.right = -cardStore.getBoundingClientRect().width + "px";
+            cardStoreToggle.children[0].style.rotate = "180deg";
+            cardStoreSettings.expanded = false;
+        } else {
+            cardStore.style.right = 0;
+            cardStoreToggle.children[0].style.rotate = "0deg";
+            cardStoreSettings.expanded = true;
+        }
+    }
+
+    window.addEventListener("load", () => {
+        const blankCard = document.getElementById("blankCard").children[0];
+        
+        const blankCardName = new TextSection();
+        blankCard.addSection(blankCardName);
+        blankCardName.setPinState("left", true);
+
+        const personCard = document.getElementById("personCard").children[0];
+        
+        const personCardName = new TextSection();
+        personCard.addSection(personCardName);
+        personCardName.setBold(true, ()=>{});
+        personCard.addSection(new ImageSection());
+        personCardName.setPinState("left", true);
+        personCardName.setPinState("right", true);
+
+        const personCardCaption = new TextSection();
+        personCard.addSection(personCardCaption);
+        personCardCaption.setFontSize(8, ()=>{});
+        personCardCaption.setItalic(true, ()=>{});
+    });
+</script>
+<script id="script-pinStrings">
+    var pinStringSettings = {
+        stringingPin: null,
+        stringing: false,
+    };
+
+    class PinString extends HTMLElement {
+        pinASection = null;
+        pinBSection = null;
+        pinAName = null;
+        pinBName = null;
+        svgElement = null;
+        lineElementA = null;
+        lineElementB = null;
+
+        constructor(pinA, pinB) {
+            super();
+            this.pinASection = pinA.section;
+            this.pinBSection = pinB.section;
+            this.pinAName = pinA.name;
+            this.pinBName = pinB.name;
+            this.pinASection.pins[this.pinAName].strings.push(this);
+            this.pinBSection.pins[this.pinBName].strings.push(this);
+        }
+
+        connectedCallback() {
+            this.svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            this.append(this.svgElement);
+
+            this.lineElementA = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            this.svgElement.append(this.lineElementA);
+
+            this.lineElementB = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            this.svgElement.append(this.lineElementB);
+            
+            this.redraw();
+        }
+
+        redraw() {
+            const pinARect = this.pinASection.pins[this.pinAName].element.getBoundingClientRect();
+            const pinBRect = this.pinBSection.pins[this.pinBName].element.getBoundingClientRect();
+
+            const x1 = pinARect.x + pinARect.width / 2;
+            const y1 = pinARect.y + pinARect.height / 2;
+            const x2 = pinBRect.x + pinBRect.width / 2;
+            const y2 = pinBRect.y + pinBRect.height / 2;
+
+            this.lineElementA.setAttribute("x1", x1);
+            this.lineElementA.setAttribute("y1", y1);
+            this.lineElementA.setAttribute("x2", x2);
+            this.lineElementA.setAttribute("y2", y2);
+            this.lineElementA.setAttribute("stroke", "#550000");
+            this.lineElementA.setAttribute("stroke-width", 6 * pageSettings.zoom);
+
+            this.lineElementB.setAttribute("x1", x1);
+            this.lineElementB.setAttribute("y1", y1);
+            this.lineElementB.setAttribute("x2", x2);
+            this.lineElementB.setAttribute("y2", y2);
+            this.lineElementB.setAttribute("stroke", "#ff2222");
+            this.lineElementB.setAttribute("stroke-width", 4 * pageSettings.zoom);
+            this.lineElementB.setAttribute("stroke-dasharray", (4 * pageSettings.zoom) + " " + 1 * pageSettings.zoom);
+        }
+        
+        remove() {
+            const pinAIndex = this.pinASection.pins[this.pinAName].strings.findIndex(x => x === this);
+            const pinBIndex = this.pinBSection.pins[this.pinBName].strings.findIndex(x => x === this);
+
+            this.pinASection.pins[this.pinAName].strings = this.pinASection.pins[this.pinAName].strings.slice(0, pinAIndex).concat(this.pinASection.pins[this.pinAName].strings.slice(pinAIndex + 1));
+            this.pinBSection.pins[this.pinBName].strings = this.pinBSection.pins[this.pinBName].strings.slice(0, pinBIndex).concat(this.pinBSection.pins[this.pinBName].strings.slice(pinBIndex + 1));
+            
+            super.remove();
+        }
+    }
+    customElements.define("custom-pin-string", PinString);
+
+    function handlePinClick(pin) {
+        if (pinStringSettings.stringing) {
+            if (pin === pinStringSettings.stringingPin) {
+                cancelPinString();
+            } else if (pin.section.parentElement === pinStringSettings.stringingPin.section.parentElement) {
+                startPinString(pin);
+            } else {
+                endPinString(pin);
+            }
+        } else {
+            startPinString(pin);
+        }
+    }
+
+    function startPinString(pin) {
+        console.log("Starting Pin String");
+
+        pinStringSettings.stringingPin = pin;
+        pinStringSettings.stringing = true;
+
+        window.addEventListener("contextmenu", cancelPinString);
+    }
+
+    function endPinString(pin) {
+        console.log("Ending Pin String");
+
+        window.removeEventListener("contextmenu", cancelPinString);
+
+        const existingConnection = pinStringSettings.stringingPin.getConnection(pin);
+        if (existingConnection === null) {
+            createPinString(pinStringSettings.stringingPin, pin);
+        } else {
+            existingConnection.remove();
+        }
+        
+        pinStringSettings.stringingPin = null;
+        pinStringSettings.stringing = false;
+    }
+
+    function cancelPinString() {
+        console.log("Canceling Pin String");
+
+        if (event !== undefined) event.preventDefault();
+        window.removeEventListener("contextmenu", cancelPinString);
+
+        pinStringSettings.stringingPin = null;
+        pinStringSettings.stringing = false;
+    }
+
+    function createPinString(startPin, endPin) {
+        const newString = new PinString(startPin, endPin);
+        main.prepend(newString);
+    }
+</script>
+<script id="script-cards">
+    var cardSettings = {activeCards: []};
+
+    class CardBase extends HTMLElement {
+        constructor(sections=[]) {
+            super();
+            this.sections = sections.map(section => section.clone());
+            this.draggable = false;
+            this.ondragstart = () => {return false;};
+        }
+
+        connectedCallback() {
+            this.updateContent();
+        }
+
+        updateContent() {
+            const first = this.children[0];
+            [...this.children].forEach(child => child.remove());
+            for (let section of this.sections) this.append(section);
+            for (let section of this.sections) section.updatePinStrings();
+            cancelPinString();
+        }
+    
+        addSection(section) {
+            this.sections.push(section);
+            this.updateContent();
+        }
+        
+        remove() {
+            this.sections.forEach(section => section.removePinStrings());
+            super.remove();
+        }
+    }
+
+    class CardPreview extends CardBase {        
+        constructor(sections=[]) {
+            super(sections);
+            this.fallbackX = null;
+            this.fallbackY = null;
+        }
+
+        connectedCallback() {
+            window.addEventListener("mousemove", this.followMouse);
+            window.addEventListener("mouseup", this.place);
+            
+            this.updateContent();
+        }
+
+        disconnectedCallback() {
+            window.removeEventListener("mousemove", this.followMouse);
+            window.removeEventListener("mouseup", this.place);
+        }
+
+        attributeChangedCallback(name, oldValue, newValue) {
+            switch (name) {
+                default:
+                    alert("Unknown Card Property: " + name);
+            }
+        }
+
+        followMouse = () => {
+            moveElementToMouse(this);
+            this.sections.forEach(section => section.updatePinStrings());
+
+            const elementsUnder = document.elementsFromPoint(event.clientX, event.clientY);
+
+            if (elementsUnder.filter(x => x.id === "trash").length > 0) {
+                this.style.filter = "var(--delete-filter)";
+            } else if (elementsUnder.filter(x => x.tagName.toUpperCase() === "ASIDE").length === 0) {
+                this.style.filter = "";
+            } else {
+                this.style.filter = "var(--reject-filter)";
+            }
+        }
+
+        place = () => {
+            this.style.filter = "";
+            const newCard = new Card(this.sections);
+            this.remove();
+
+            const elementsUnder = document.elementsFromPoint(event.clientX, event.clientY);
+            
+            if (elementsUnder.filter(x => x.id === "trash").length > 0) {
+                // Deleted
+                if (this.fallbackX === null || this.fallbackY === null) return;
+
+                newCard.x = this.fallbackX;
+                newCard.y = this.fallbackY;
+
+                deleteCard(newCard);
+
+                return;
+            } else if (elementsUnder.filter(x => x.tagName.toUpperCase() === "ASIDE").length === 0) {
+                // Placed
+                // Transform mouse coords to board coords
+                newCard.x = (event.clientX - pageSettings.pan.x) / pageSettings.zoom;
+                newCard.y = (event.clientY - pageSettings.pan.y - this.getBoundingClientRect().height) / pageSettings.zoom;
+            } else {
+                // Rejected
+                if (this.fallbackX === null || this.fallbackY === null) return;
+                
+                newCard.x = this.fallbackX;
+                newCard.y = this.fallbackY;
+            }
+
+            main.append(newCard);
+        }
+    }
+    customElements.define("custom-card-preview", CardPreview);
+
+    class CardTemplate extends CardBase {
+        constructor() {
+            super();
+        }
+
+        connectedCallback() {
+            this.addEventListener("mousedown", () => {
+                const newCard = new CardPreview([...this.sections].map(section => section.clone()));
+                document.body.append(newCard);
+                newCard.followMouse();
+            });
+
+            this.updateContent();
+        }
+
+        attributeChangedCallback(name, oldValue, newValue) {
+            switch (name) {
+                default:
+                    alert("Unknown Card Property: " + name);
+            }
+        }
+    }
+    customElements.define("custom-card-template", CardTemplate);
+
+    class Card extends CardBase {
+        static observedAttributes = ["x", "y"];
+
+        constructor(sections=[]) {
+            super(sections);
+            this.x = 0;
+            this.y = 0;
+        }
+
+        connectedCallback() {
+            this.addEventListener("mousedown", this.handleMousedown);
+
+            cardSettings.activeCards.push(this);
+
+            this.updatePosition();
+            this.updateContent();
+        }
+
+        disconnectedCallback() {
+            this.removeEventListener("mousedown", this.handleMousedown);
+            this.removeEventListener("contextmenu", this.handleContextMenu);
+        }
+
+        attributeChangedCallback(name, oldValue, newValue) {
+            switch (name) {
+                case "x":
+                    this.x = parseInt(newValue);
+                    break;
+                case "y":
+                    this.y = parseInt(newValue);
+                    break;
+                default:
+                    alert("Unknown Card Property: " + name);
+            }
+        }
+
+        handleMousedown = () => {
+            if (!(event.buttons & 1)) return;
+            event.stopPropagation();
+            if (cardEditorSettings.card !== this) closeCardEditor();
+
+            const mouseupHandler = () => {
+                window.removeEventListener("mousemove", mousemoveHandler);
+                editCard(this);
+            };
+
+            const mousemoveHandler = () => {
+                window.removeEventListener("mouseup", mouseupHandler);
+                this.becomePicked(this);
+                closeCardEditor();
+            };
+
+            window.addEventListener("mouseup", mouseupHandler, {once: true});
+            window.addEventListener("mousemove", mousemoveHandler, {once: true});
+        }
+
+        becomePicked = () => {
+            const pickedCard = new CardPreview(this.sections);
+            main.append(pickedCard);
+            pickedCard.fallbackX = this.x;
+            pickedCard.fallbackY = this.y;
+            pickedCard.followMouse();
+            this.remove();
+        }
+
+        updatePosition() {
+            this.style.left = this.x * pageSettings.zoom + pageSettings.pan.x + "px";
+            this.style.top = this.y * pageSettings.zoom + pageSettings.pan.y + "px";
+            this.style.transform = "translate(-50%, -50%) scale(" + pageSettings.zoom + ")";
+
+            this.sections.forEach(section => section.updatePinStrings());
+        }
+
+        moveSectionUp(section) {
+            const index = this.sections.findIndex(x => x === section);
+            if (index === 0) return;
+            this.sections[index] = this.sections[index - 1];
+            this.sections[index - 1] = section;
+            this.updateContent();
+            openCardEditor(this);
+        }
+        
+        moveSectionDown(section) {
+            const index = this.sections.findIndex(x => x === section);
+            if (index === this.sections.length - 1) return;
+            this.sections[index] = this.sections[index + 1];
+            this.sections[index + 1] = section;
+            this.updateContent();
+            openCardEditor(this);
+        }
+
+        deleteSection(section) {
+            const index = this.sections.findIndex(x => x === section);
+            this.sections = this.sections.slice(0, index).concat(this.sections.slice(index + 1));
+            this.updateContent();
+            openCardEditor(this);
+        }
+
+        sectionIsFirst(section) {return this.sections[0] === section;}
+
+        sectionIsLast(section) {return this.sections[this.sections.length - 1] === section;}
+
+    }
+    customElements.define("custom-card", Card);
+
+    function updateCards() {cardSettings.activeCards.forEach(card => {card.updatePosition()});}
+
+    function editCard(card) {openCardEditor(card)}
+
+    function deleteCard(card) {card.remove()}
+</script>
+<script id="script-sections">
+    class Section extends HTMLElement {
+        pins = {
+            left: {
+                element: null,
+                state: false,
+                strings: [],
+            },
+            right: {
+                element: null,
+                state: false,
+                strings: [],
+            },
+        };
+        sectionControls = null;
+        originalStrings = null;
+
+        connectedCallback(template) {
+            this.classList.add(template.classList);
+            this.append(template.content.cloneNode(true));
+
+            this.pins.left.element = this.getElementsByClassName("leftPin")[0];
+            this.pins.right.element = this.getElementsByClassName("rightPin")[0];
+
+            this.pins.left.element.setSection(this, "left");
+            this.pins.right.element.setSection(this, "right");
+
+            if (this.originalStrings !== null) {
+                this.reinstatePinStrings();
+                this.originalStrings = null;
+            }
+            this.updatePins();
+        }
+
+        clone(clone) {
+            clone.originalStrings = {left: [], right: []};
+            for (let pin in this.pins) {
+                clone.pins[pin].state = this.pins[pin].state;
+                clone.originalStrings[pin] = this.pins[pin].strings.map(string => {
+                    return {
+                        sectionA: string.pinASection === this ? clone : string.pinASection,
+                        sectionB: string.pinBSection === this ? clone : string.pinBSection,
+                        nameA: string.pinAName,
+                        nameB: string.pinBName
+                    }
+                });
+            };
+            return clone;
+        }
+
+        reinstatePinStrings() {
+            for (let pin in this.originalStrings) {
+                this.originalStrings[pin].forEach(string => createPinString(
+                    string.sectionA.pins[string.nameA].element,
+                    string.sectionB.pins[string.nameB].element
+                ));
+            }
+        }
+
+        updatePinStrings() {for (let pin in this.pins) this.pins[pin].strings.forEach(string => string.redraw())}
+
+        setPinState(pinName, newPinState) {
+            this.pins[pinName].state = !this.pins[pinName].state;
+            this.updatePins();
+        }
+
+        getPinState(pinName) {return this.pins[pinName].state;}
+
+        updatePins() {for (let pin in this.pins) this.pins[pin].element.update()}
+
+        removePinStrings() {for (let pin in this.pins) if (this.pins[pin].element !== null) this.pins[pin].element.removePinStrings()}
+
+        moveUp = () => {this.parentElement.moveSectionUp(this)}
+
+        moveDown = () => {this.parentElement.moveSectionDown(this)}
+
+        delete = () => {this.parentElement.deleteSection(this)}
+
+        isFirst = () => {return this.parentElement.sectionIsFirst(this)}
+
+        isLast = () => {return this.parentElement.sectionIsLast(this)}
+
+        updateContent(refreshParent) {
+            if (refreshParent) this.parentElement.updateContent();
+        };
+    }
+
+    class TextSection extends Section {
+        fontColor = "black";
+        fontSize = {
+            current: 10,
+            min: 1,
+            max: 72
+        };
+        bold = false;
+        italic = false;
+        underline = false;
+        textAlign = "center";
+        text = "";
+
+        constructor() {
+            super();
+        }
+
+        connectedCallback() {
+            super.connectedCallback(document.getElementById("textSectionTemplate"));
+            this.textElement = this.getElementsByTagName("div")[0];
+            this.updateContent();
+        }
+
+        disconnectedCallback() {
+            [...this.children].forEach(el => el.remove());
+        }
+
+        clone() {
+            const clone = this.cloneNode(false);
+            clone.text = this.text;
+            clone.fontColor = this.fontColor;
+            clone.fontSize.current = this.fontSize.current;
+            clone.bold = this.bold;
+            clone.italic = this.italic;
+            clone.underline = this.underline;
+            clone.textAlign = this.textAlign;
+            return super.clone(clone);
+        }
+
+        createEditor() {
+            return new TextSectionEditor(this);
+        }
+
+        setText(newText, resultCallback) {
+            this.text = newText;
+            this.updateContent(true);
+            resultCallback(this.text);
+        }
+
+        setFontColor(newFontColor, resultCallback) {
+            this.fontColor = newFontColor;
+            this.updateContent(true);
+            resultCallback(this.fontColor);
+        }
+
+        setFontSize(newFontSize, resultCallback) {
+            try {
+                const size = Math.min(Math.max(parseInt(newFontSize), this.fontSize.min), this.fontSize.max);
+                if (!isNaN(size)) this.fontSize.current = size;
+            } catch {};
+            this.updateContent(true);
+            resultCallback(this.fontSize.current);
+        }
+
+        setBold(newBold, resultCallback) {
+            this.bold = newBold;
+            this.updateContent(true);
+            resultCallback(this.bold);
+        }
+
+        setItalic(newItalic, resultCallback) {
+            this.italic = newItalic;
+            this.updateContent(true);
+            resultCallback(this.italic);
+        }
+
+        setUnderline(newUnderline, resultCallback) {
+            this.underline = newUnderline;
+            this.updateContent(true);
+            resultCallback(this.underline);
+        }
+
+        setTextAlign(newTextAlign, resultCallback  ) {
+            this.textAlign = newTextAlign;
+            this.updateContent(true);
+            resultCallback(this.textAlign);
+        }
+
+        updateContent(refreshParent=false) {
+            this.textElement.textContent = this.text === "" ? " " : this.text;
+            this.textElement.style.color = this.fontColor;
+            this.textElement.style.fontSize = this.fontSize.current + "pt";
+            this.textElement.style.fontWeight = this.bold ? "bold" : "normal";
+            this.textElement.style.fontStyle = this.italic ? "italic" : "normal";
+            this.textElement.style.textDecoration = this.underline ? "underline" : "none";
+            this.textElement.style.textAlign = this.textAlign;
+            super.updateContent(refreshParent);
+        }
+    }
+    customElements.define("custom-text-section", TextSection);
+
+    class ImageSection extends Section {
+        defaultImage = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%20-960%20960%20960%22%20fill%3D%22%23555%22%3E%3Cpath%20d%3D%22M424-320q0-81%2014.5-116.5T500-514q41-36%2062.5-62.5T584-637q0-41-27.5-68T480-732q-51%200-77.5%2031T365-638l-103-44q21-64%2077-111t141-47q105%200%20161.5%2058.5T698-641q0%2050-21.5%2085.5T609-475q-49%2047-59.5%2071.5T539-320H424Zm56%20240q-33%200-56.5-23.5T400-160q0-33%2023.5-56.5T480-240q33%200%2056.5%2023.5T560-160q0%2033-23.5%2056.5T480-80Z%22%2F%3E%3C%2Fsvg%3E";
+        image = null;
+
+        constructor() {
+            super();
+            this.image = this.defaultImage;
+        }
+
+        connectedCallback() {            
+            super.connectedCallback(document.getElementById("imageSectionTemplate"));
+            this.imageElement = this.getElementsByTagName("img")[0];
+            this.updateContent();
+        }
+
+        disconnectedCallback() {
+            [...this.children].forEach(el => el.remove());
+        }
+
+        clone() {
+            const clone = this.cloneNode(false);
+            clone.image = this.image;
+            return super.clone(clone);
+        }
+
+        createEditor() {
+            return new ImageSectionEditor(this);
+        }
+
+        setImage(newImage, resultCallback) {
+            if (newImage === null) {
+                console.log("Clearing")
+                this.image = this.defaultImage;
+                this.updateContent(true);
+                resultCallback(this.image);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.addEventListener("load", () => {
+                const tempImage = new Image();
+                tempImage.addEventListener("load", () => {
+                    const canvas = document.getElementById("imageResizer");
+                    const ctx = canvas.getContext("2d");
+
+                    canvas.width = 300;
+                    canvas.height = tempImage.height * (canvas.width / tempImage.width);
+
+                    ctx.drawImage(tempImage, 0, 0, canvas.width, canvas.height);
+
+                    canvas.toBlob((blob) => {
+                        this.image = URL.createObjectURL(blob);
+                        this.updateContent(true);
+                        resultCallback(this.image);
+                    })
+                });
+                tempImage.src = reader.result;
+            });
+            reader.readAsDataURL(newImage);
+        }
+
+        updateContent(refreshParent=false) {
+            this.imageElement.src = this.image;
+            this.imageElement.addEventListener("load", () => {super.updateContent(refreshParent)});
+        }
+    }
+    customElements.define("custom-image-section", ImageSection);
+</script>
+<script id="script-section-editors">
+    class SectionEditor extends HTMLElement {
+        constructor(section) {
+            super();
+            this.section = section;
+        }
+
+        connectedCallback(template) {
+            this.classList.add(template.classList);
+            this.append(template.content.cloneNode(true));
+
+            const leftPin = this.getElementsByClassName("leftPin")[0];
+            const rightPin = this.getElementsByClassName("rightPin")[0];
+            const sectionControls = this.getElementsByTagName("custom-section-controls")[0];
+            
+            leftPin.setSection(this.section, "left");
+            rightPin.setSection(this.section, "right");
+            sectionControls.setSection(this.section);
+        }
+    }
+
+    class TextSectionEditor extends SectionEditor {
+        connectedCallback() {
+            super.connectedCallback(document.getElementById("textSectionEditorTemplate"));
+
+            const textInput = this.getElementsByClassName("textInput")[0];
+            const fontColorInput = this.getElementsByClassName("fontColorInput")[0];
+            const fontSizeInput = this.getElementsByClassName("fontSizeInput")[0];
+            const boldInput = this.getElementsByClassName("boldInput")[0];
+            const italicInput = this.getElementsByClassName("italicInput")[0];
+            const underlineInput = this.getElementsByClassName("underlineInput")[0];
+            const textAlignLeftInput = this.getElementsByClassName("textAlignLeftInput")[0];
+            const textAlignCenterInput = this.getElementsByClassName("textAlignCenterInput")[0];
+            const textAlignRightInput = this.getElementsByClassName("textAlignRightInput")[0];
+
+            textInput.value = this.section.text;
+            fontColorInput.value = this.section.fontColor;
+            fontSizeInput.value = this.section.fontSize.current;
+            fontSizeInput.min = this.section.fontSize.min;
+            fontSizeInput.max = this.section.fontSize.max;
+            boldInput.checked = this.section.bold;
+            italicInput.checked = this.section.italic;
+            underlineInput.checked = this.section.underline;
+            const alignName = Math.random();
+            textAlignLeftInput.name = alignName;
+            textAlignLeftInput.checked = this.section.textAlign === "left";
+            textAlignCenterInput.name = alignName;
+            textAlignCenterInput.checked = this.section.textAlign === "center";
+            textAlignRightInput.name = alignName;
+            textAlignRightInput.checked = this.section.textAlign === "right";
+
+            textInput.addEventListener("input", () => {this.section.setText(textInput.value, result => textInput.value = result)});
+            fontColorInput.addEventListener("input", () => {this.section.setFontColor(fontColorInput.value, result => fontColorInput.value = result)});
+            fontSizeInput.addEventListener("input", () => {this.section.setFontSize(fontSizeInput.value, result => fontSizeInput.value = result)});
+            boldInput.addEventListener("input", () => {this.section.setBold(boldInput.checked, result => boldInput.checked = result)});
+            italicInput.addEventListener("input", () => {this.section.setItalic(italicInput.checked, result => italicInput.checked = result)});
+            underlineInput.addEventListener("input", () => {this.section.setUnderline(underlineInput.checked, result => underlineInput.checked = result)});
+            const textAlignHandler = () => {this.section.setTextAlign(textAlignLeftInput.checked ? "left" : (textAlignCenterInput.checked ? "center" : "right"), result => {
+                textAlignLeftInput.checked = result === "left";
+                textAlignCenterInput.checked = result === "center";
+                textAlignRightInput.checked = result === "right";
+            })};
+            textAlignLeftInput.addEventListener("input", textAlignHandler);
+            textAlignCenterInput.addEventListener("input", textAlignHandler);
+            textAlignRightInput.addEventListener("input", textAlignHandler);
+        }
+    }
+    customElements.define("custom-text-section-editor", TextSectionEditor);
+    
+    class ImageSectionEditor extends SectionEditor {
+        connectedCallback() {
+            super.connectedCallback(document.getElementById("imageSectionEditorTemplate"));
+            
+            const imagePreview = this.getElementsByClassName("imagePreview")[0];
+            const uploadInput = this.getElementsByClassName("uploadInput")[0];
+            const resetInput = this.getElementsByClassName("resetInput")[0];
+
+            imagePreview.src = this.section.image;
+            
+            const uploadHandler = () => {
+                this.section.setImage(event.target === resetInput ? null : uploadInput.files[0], result => {
+                imagePreview.src = result;
+            })};
+            uploadInput.addEventListener("input", uploadHandler);
+            resetInput.addEventListener("click", uploadHandler);
+        }
+    }
+    customElements.define("custom-image-section-editor", ImageSectionEditor);
+</script>
+<script id="script-pins">
+    class Pin extends HTMLElement {
+        section = null;
+        name = null;
+
+        connectedCallback() {
+            if (this.parentElement !== null && this.parentElement.parentElement.tagName.toLowerCase() === "custom-card") {
+                this.addEventListener("mousedown", () => {
+                    event.stopPropagation();
+                    handlePinClick(this);
+                });
+            }
+        }
+
+        setSection(newSection, newName) {
+            this.section = newSection;
+            this.name = newName;
+        }
+
+        update() {
+            this.style.display = this.section.pins[this.name].state ? "block" : "none";
+            if (this.section.pins[this.name].state) {
+                this.section.pins[this.name].strings.forEach(string => string.redraw());
+            } else {
+                this.section.pins[this.name].strings.forEach(string => string.remove());
+            }
+        }
+
+        removePinStrings() {this.section.pins[this.name].strings.forEach(string => string.remove())}
+
+        getConnection(pin) {
+            const connections = this.section.pins[this.name].strings.filter(
+                string => (string.pinASection === pin.section && string.pinAName === pin.name) || (string.pinBSection === pin.section && string.pinBName === pin.name)
+            );
+            return connections.length === 0 ? null : connections[0];
+        }
+    }
+    customElements.define("custom-pin", Pin);
+
+    class PinEditor extends HTMLElement {
+        pinName = null;
+
+        connectedCallback() {
+            this.addEventListener("click", () => {
+                if (this.section === null) return;
+                this.section.setPinState(this.pinName, !this.section.getPinState(this.pinName));
+                this.update();
+            })
+        }
+
+        setSection(newSection, newPinName) {
+            this.section = newSection;
+            this.pinName = newPinName;
+            this.update();
+        }
+
+        update() {
+            if (this.section === null) return;
+            const state = this.section.getPinState(this.pinName);
+            this.style.opacity = state ? "100%" : "30%";
+        }
+    }
+    customElements.define("custom-pin-editor", PinEditor);
+</script>
+<script id="script-section-controls">
+    class SectionControls extends HTMLElement {
+        connectedCallback() {
+            const template = document.getElementById("sectionControlsTemplate");
+            this.append(template.content.cloneNode(true));
+        }
+
+        setSection(newSection) {
+            const section = newSection;
+
+            const upInput = this.getElementsByClassName("upInput")[0];
+            const deleteInput = this.getElementsByClassName("deleteInput")[0];
+            const downInput = this.getElementsByClassName("downInput")[0];
+
+            upInput.disabled = section.isFirst();
+            downInput.disabled = section.isLast();
+
+            upInput.addEventListener("click", section.moveUp);
+            deleteInput.addEventListener("click", section.delete);
+            downInput.addEventListener("click", section.moveDown);
+        }
+    }
+    customElements.define("custom-section-controls", SectionControls);
+</script>
+<script id="script-cardEditor">
+    var cardEditorSettings = {
+        card: null,
+    };
+
+    const cardEditor = document.getElementById("cardEditor");
+    const cardEditorSections = cardEditor.getElementsByTagName("ol")[0];
+
+    function openCardEditor(card) {
+        cardEditorSettings.card = card;
+        cardEditor.style.right = "0px";
+
+        [...cardEditorSections.children].forEach(sectionEditor => sectionEditor.remove());
+        for (let section of cardEditorSettings.card.sections) cardEditorSections.append(section.createEditor());
+
+        main.addEventListener("mousedown", closeCardEditor);
+    }
+
+    function closeCardEditor() {
+        cardEditorSettings.card = null;
+        cardEditor.style.right = -cardEditor.getBoundingClientRect().width + "px";
+    }
+
+    function addTextSection() {
+        cardEditorSettings.card.addSection(new TextSection());
+        openCardEditor(cardEditorSettings.card);
+    }
+
+    function addImageSection() {
+        cardEditorSettings.card.addSection(new ImageSection());
+        openCardEditor(cardEditorSettings.card);
+    }
+
+    window.addEventListener("load", () => {
+        closeCardEditor();
+
+        // TODO: Remove after testing.
+        const cardPerson = new Card();
+        cardPerson.x = 300;
+        cardPerson.y = 400;
+        main.append(cardPerson);
+
+        const cardPersonName = new TextSection();
+        cardPerson.addSection(cardPersonName);
+        cardPersonName.setText("Person", ()=>{});
+        cardPersonName.setBold(true, ()=>{});
+        cardPersonName.setPinState("left", true);
+        cardPersonName.setPinState("right", true);
+        
+        const cardPersonImage = new ImageSection();
+        cardPerson.addSection(cardPersonImage);
+
+        const cardPersonCaption = new TextSection();
+        cardPerson.addSection(cardPersonCaption);
+        cardPersonCaption.setText("Lord of Earlsworth", ()=>{});
+        cardPersonCaption.setFontSize(8, ()=>{});
+        cardPersonCaption.setItalic(true, ()=>{});
+
+    
+        const cardStatement = new Card();
+        cardStatement.x = 600;
+        cardStatement.y = 400;
+        main.append(cardStatement);
+
+        
+        const cardStatementStatement = new TextSection();
+        cardStatement.addSection(cardStatementStatement);
+        cardStatementStatement.setText("Statement", ()=>{});
+        cardStatementStatement.setPinState("left", true);
+
+        createPinString(cardPersonName.pins["right"].element, cardStatementStatement.pins["left"].element);
+        
+        // openCardEditor(card);
+        // Removal End.
+    });
+</script>
+<script id="script-utility">
+    function moveElementToMouse(element, mouseEvent=event) {
+        element.style.left = mouseEvent.clientX + "px";
+        element.style.top = mouseEvent.clientY + "px";
+    }
+</script>
+</html>
