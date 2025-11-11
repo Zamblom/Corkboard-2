@@ -716,7 +716,6 @@
             height: 80%;
         }
     </style>
-    <meta http-equiv="Content-Security-Policy" content="media-src * blob:"/>
 </head>
 <body>
     <main id="main" onmousedown="handlePanStart()" onmouseup="handlePanEnd()" onmouseleave="handlePanEnd()" onmousemove="handlePan()" onwheel="handleZoom()">
@@ -1790,11 +1789,9 @@
 
                     ctx.drawImage(tempImage, 0, 0, canvas.width, canvas.height);
 
-                    canvas.toBlob((blob) => {
-                        this.image = URL.createObjectURL(blob);
-                        this.updateContent(true);
-                        resultCallback(this.image);
-                    })
+                    this.image = canvas.toDataURL();
+                    this.updateContent(true);
+                    resultCallback(this.image);
                 });
                 tempImage.src = reader.result;
             });
