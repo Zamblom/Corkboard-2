@@ -50,7 +50,7 @@
 
             > button {
                 display: block;
-                height: 75px;
+                height: 65px;
                 aspect-ratio: 1;
                 border-radius: 10px;
                 background-color: white;
@@ -307,6 +307,7 @@
             > div {
                 flex-grow: 1;
                 vertical-align: middle;
+                max-width: calc(100% - 20px);
             }
         }
 
@@ -727,16 +728,21 @@
         </button>
         <button onclick="resetPan()">Recentre</button>
         <button onclick="resetZoom()">Rezoom</button>
+        <button onclick="clearWithConfirm()">Clear</button>
+        <button onclick="saveLocalWithConfirm()">Save</button>
+        <button onclick="loadLocalWithConfirm()">Load</button>
+        <button onclick="loadFile()">Import</button>
+        <button onclick="saveFile()">Export</button>
     </div>
     <aside id="cardStore">
         <button id="cardStoreToggle" onclick="toggleCardStore()">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="grey"><path d="m321-80-71-71 329-329-329-329 71-71 400 400L321-80Z"/></svg>
         </button>
         <div class="storeCard" id="storeBlankCard">
-            <custom-card-template></custom-card-template>
+            <custom-card-template size="medium"></custom-card-template>
         </div>
         <div class="storeCard" id="storePersonCard">
-            <custom-card-template></custom-card-template>
+            <custom-card-template size="medium"></custom-card-template>
         </div>
         <div class="storeCard" id="storeGrouping">
             <custom-grouping-template></custom-grouping-template>
@@ -837,6 +843,7 @@
 </body>
 <script id="script-pageNavigation">
     var pageSettings = {
+        filename: "file",
         zoom: 1,
         panning: false,
         pan: {x: 0, y: 0},
@@ -1172,8 +1179,9 @@
         sizes = ["tiny", "small", "medium", "large", "huge", "obscene"];
         size = "medium";
 
-        constructor(sections=[]) {
+        constructor(size, sections=[]) {
             super();
+            this.size = size;
             this.sections = sections.map(section => section.clone());
             this.draggable = false;
             this.ondragstart = () => {return false};
@@ -1211,8 +1219,8 @@
     }
 
     class CardPreview extends CardBase {        
-        constructor(sections=[]) {
-            super(sections);
+        constructor(size, sections=[]) {
+            super(size, sections);
             this.fallbackX = null;
             this.fallbackY = null;
         }
@@ -1253,7 +1261,7 @@
 
         place = () => {
             this.style.filter = "";
-            const newCard = new Card(this.sections);
+            const newCard = new Card(this.size, this.sections);
             this.remove();
 
             const elementsUnder = document.elementsFromPoint(event.clientX, event.clientY);
@@ -1287,13 +1295,11 @@
     customElements.define("custom-card-preview", CardPreview);
 
     class CardTemplate extends CardBase {
-        constructor() {
-            super();
-        }
+        static observedAttributes = ["size"];
 
         connectedCallback() {
             this.addEventListener("mousedown", () => {
-                const newCard = new CardPreview([...this.sections].map(section => section.clone()));
+                const newCard = new CardPreview(this.size, [...this.sections].map(section => section.clone()));
                 document.body.append(newCard);
                 newCard.followMouse();
             });
@@ -1303,6 +1309,10 @@
 
         attributeChangedCallback(name, oldValue, newValue) {
             switch (name) {
+                case "size":
+                    this.size = newValue;
+                    this.updateContent();
+                    break;
                 default:
                     alert("Unknown Card Property: " + name);
             }
@@ -1313,8 +1323,8 @@
     class Card extends CardBase {
         static observedAttributes = ["x", "y"];
 
-        constructor(sections=[]) {
-            super(sections);
+        constructor(size, sections=[]) {
+            super(size, sections);
             this.x = 0;
             this.y = 0;
         }
@@ -1378,7 +1388,7 @@
         }
 
         becomePicked = () => {
-            const pickedCard = new CardPreview(this.sections);
+            const pickedCard = new CardPreview(this.size, this.sections);
             main.append(pickedCard);
             pickedCard.fallbackX = this.x;
             pickedCard.fallbackY = this.y;
@@ -1434,8 +1444,7 @@
         }
 
         static load(cardObject) {
-            const card = new Card();
-            card.size = cardObject.size,
+            const card = new Card(cardObject.size);
             card.x = cardObject.x;
             card.y = cardObject.y;
             card.rotate = cardObject.rotate;
@@ -2331,9 +2340,19 @@
             window.addEventListener("mouseup", () => {window.removeEventListener("mousemove", handleBottomMouseMove), {once: true}});
         }
 
+        setTopText(newTopText) {
+            this.text.top = newTopText;
+            this.updatePosition();
+        }
+
+        setBottomText(newBottomText) {
+            this.text.bottom = newBottomText;
+            this.updatePosition();
+        }
+
         setColor(newColor) {
             this.color = newColor;
-            this.redraw();
+            this.updatePosition();
         }
 
         updatePosition() {
@@ -2487,6 +2506,11 @@
         redraw = () => {
             const originalColor = this.color;
             this.color = this.hovered ? "#cc4" : originalColor;
+
+            const bounds = this.getBoundingClientRect();
+            this.children[2].style.width = bounds.width + "px";
+            this.children[2].style.height = bounds.height + "px";
+
             super.redraw();
             this.color = originalColor;
         }
@@ -2540,48 +2564,6 @@
 
     window.addEventListener("load", closeGroupingEditor);
 </script>
-<!-- <script id="script-temp">
-    // TODO: Remove
-    window.addEventListener("load", () => {
-        const cardPerson = new Card();
-        cardPerson.x = 300;
-        cardPerson.y = 400;
-        main.append(cardPerson);
-
-        const cardPersonName = new TextSection();
-        cardPerson.addSection(cardPersonName);
-        cardPersonName.setText("Person", ()=>{});
-        cardPersonName.setBold(true, ()=>{});
-        cardPersonName.setPinState("left", true);
-        cardPersonName.setPinState("right", true);
-        
-        const cardPersonImage = new ImageSection();
-        cardPerson.addSection(cardPersonImage);
-
-        const cardPersonCaption = new TextSection();
-        cardPerson.addSection(cardPersonCaption);
-        cardPersonCaption.setText("Lord of Earlsworth", ()=>{});
-        cardPersonCaption.setFontSize(8, ()=>{});
-        cardPersonCaption.setItalic(true, ()=>{});
-
-    
-        const cardStatement = new Card();
-        cardStatement.x = 600;
-        cardStatement.y = 400;
-        main.append(cardStatement);
-
-        
-        const cardStatementStatement = new TextSection();
-        cardStatement.addSection(cardStatementStatement);
-        cardStatementStatement.setText("Statement", ()=>{});
-        cardStatementStatement.setPinState("left", true);
-
-        createPinString(cardPersonName.pins["right"].element, cardStatementStatement.pins["left"].element);
-
-        const grouping = new Grouping("Grouping", "", "white", 500, 500, 200, 100);
-        main.append(grouping);
-    });
-</script> -->
 <script id="script-utility">
     function moveElementToMouse(element, mouseEvent=event) {
         element.style.left = mouseEvent.clientX + "px";
@@ -2591,6 +2573,7 @@
     function save() {
         const saveObject = {
             version: 1,
+            filename: pageSettings.filename,
             cards: cardSettings.activeCards.map(card => card.save()),
             groupings: groupingSettings.activeGroupings.map(grouping => grouping.save()),
         }
@@ -2610,8 +2593,14 @@
     }
 
     function clear() {
+        pageSettings.filename = "file";
         cardSettings.activeCards.forEach(card => card.remove());
         groupingSettings.activeGroupings.forEach(grouping => grouping.remove());
+    }
+
+    function clearWithConfirm() {   
+        if (!confirm("Are you sure you wish to clear the current page?")) return;
+        clear();
     }
 
     function reload() {
@@ -2621,6 +2610,7 @@
     }
 
     function load_1(saveObject) {
+        pageSettings.filename = saveObject.filename;
         saveObject.cards.forEach(cardString => main.append(Card.load(cardString)));
         saveObject.groupings.forEach(groupingString => main.append(Grouping.load(groupingString)));
         loadPinStrings(saveObject.cards);
@@ -2635,5 +2625,180 @@
         const saveString = localStorage.getItem("save");
         if (saveString !== null) load(saveString);
     }
+
+    function saveLocalWithConfirm() {
+        saveLocal();
+        alert("Save Successful!");
+    }
+
+    function loadLocalWithConfirm() {
+        if (!confirm("Are you sure you wish to overwrite the current page?")) return;
+        clear();
+        loadLocal();
+    }
+
+    function saveFile() {
+        const filename = prompt("Enter File Name: ", pageSettings.filename);
+        if (filename === null) return;
+        pageSettings.filename = filename.split(".")[0]
+        const saveLink = document.createElement("a");
+        saveLink.href = "data:text/plain," + save();
+        saveLink.download = pageSettings.filename + ".board2";
+        saveLink.click();
+    }
+
+    function loadFile() {
+        if (!confirm("Are you sure you wish to overwrite the current page?")) return;
+        clear();
+        const loadInput = document.createElement("input");
+        loadInput.type = "file";
+        loadInput.accept = ".board,.board2";
+        loadInput.addEventListener("input", () => {
+            console.log();
+            const reader = new FileReader();
+            reader.addEventListener("load", () => {
+                switch (loadInput.files[0].name.split(".")[1]) {
+                    case "board":
+                        load_board(reader.result);
+                        break;
+                    case "board2":
+                        load(reader.result);
+                        break;
+                    default:
+                        console.error("Unrecognised format: " + loadInput.files[0].name.split(".")[1]);
+                }
+            })
+            reader.readAsText(loadInput.files[0]);
+        });
+        loadInput.click();
+    }
+
+    function load_board(saveString) {
+        const saveObject = JSON.parse(saveString);
+        console.log(saveObject);
+
+        const linkedCards = [];
+        const unlinkedCards = {};
+
+        for (i in saveObject) {
+            const cardObject = saveObject[i];
+
+            const card = new Card("medium");
+            card.x = cardObject.position.x;
+            card.y = cardObject.position.y;
+            card.rotate = "0deg";
+
+            let hasTitle = false;
+            let hasImage = false;
+            let hasCaption = false;
+
+            if (cardObject.title !== undefined) {
+                hasTitle = true;
+                const title = new TextSection();
+                title.text = cardObject.title;
+                title.fontSize.current = 14;
+                title.bold = true;
+                title.pins.left.state = true;
+                title.pins.right.state = true;
+                card.sections.push(title);
+            }
+
+            if (cardObject.image !== undefined) {
+                hasImage = true;
+                const image = new ImageSection();
+                if (!hasTitle) {
+                    image.pins.left.state = true;
+                    image.pins.right.state = true;
+                }
+                card.sections.push(image);
+            }
+
+            if (cardObject.caption !== undefined) {
+                hasCaption = true;
+                const caption = new TextSection();
+                caption.text = cardObject.caption;
+                caption.italic = true;
+                card.sections.push(caption);
+            }
+
+            let hasLinkedComment = false;
+
+            if (!hasTitle && !hasImage && !hasCaption) {
+                hasLinkedComment = true;
+                const linkedComment = new TextSection();
+                linkedComment.text = cardObject.comments[0];
+                linkedComment.fontSize.current = 8;
+                linkedComment.pins.left.state = true;
+                card.sections.push(linkedComment);
+            }
+            linkedCards.push(card);
+            unlinkedCards[linkedCards.length - 1] = [];
+
+            if (cardObject.comments === undefined) continue;
+
+            cardObject.comments.slice(hasLinkedComment ? 1 : 0).forEach(commentText => {
+                const commentCard = new Card("medium");
+                commentCard.x = cardObject.position.x;
+                commentCard.rotate = "0deg";
+                const comment = new TextSection();
+                comment.text = commentText;
+                comment.fontSize.current = 8;
+                comment.pins.left.state = true;
+                commentCard.sections.push(comment);
+                unlinkedCards[linkedCards.length - 1].push(commentCard);
+            });
+        }
+
+        for (let card of linkedCards) main.append(card);
+        
+        for (let i in saveObject) {
+            const cardObject = saveObject[i];
+            if (cardObject.connections === undefined) continue;
+            
+            for (let c of cardObject.connections) {
+                const iTopSection = cardSettings.activeCards[parseInt(i)].sections[0];
+                const cTopSection = cardSettings.activeCards[c].sections[0];
+
+                if (iTopSection.pins.left.element.getConnection(cTopSection.pins.left.element) !== null) continue;
+                if (iTopSection.pins.left.element.getConnection(cTopSection.pins.right.element) !== null) continue;
+                if (iTopSection.pins.right.element.getConnection(cTopSection.pins.left.element) !== null) continue;
+                if (iTopSection.pins.right.element.getConnection(cTopSection.pins.right.element) !== null) continue;
+
+                let pinA;
+                let pinB;
+
+                if (!iTopSection.pins.right.state || cardObject.position.x > saveObject[c].position.x) {
+                    pinA = iTopSection.pins.left.element;
+                } else {
+                    pinA = iTopSection.pins.right.element;
+                }
+
+                if (!cTopSection.pins.right.state || cardObject.position.x <= saveObject[c].position.x) {
+                    pinB = cTopSection.pins.left.element;
+                } else {
+                    pinB = cTopSection.pins.right.element;
+                }
+
+                createPinString(pinA, pinB, "red");
+            }
+        }
+
+        for (let i in unlinkedCards) {
+            const mainCard = cardSettings.activeCards[i];
+            const margin = 5;
+            let y = mainCard.x + mainCard.getBoundingClientRect().height + margin;
+
+            for (let card of unlinkedCards[i]) {
+                card.y = y;
+                main.append(card);
+                y += card.getBoundingClientRect().height + margin;
+            }            
+        }
+    }
+
+    window.addEventListener("load", loadLocal());
+
+    window.addEventListener("resize", closeCardEditor);
+    window.addEventListener("resize", closeGroupingEditor);
 </script>
 </html>
