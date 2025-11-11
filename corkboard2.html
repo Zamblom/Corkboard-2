@@ -891,7 +891,10 @@
     function resetPan() {
         pageSettings.pan.x = 0;
         pageSettings.pan.y = 0;
+        const tmpPanning = pageSettings.panning;
+        pageSettings.panning = true;
         handlePan();
+        pageSettings.panning = tmpPanning;
     }
 
     function resetZoom() {
