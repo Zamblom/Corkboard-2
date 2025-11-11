@@ -308,6 +308,14 @@
                 flex-grow: 1;
                 vertical-align: middle;
             }
+
+            > div.leftPinned, > div.rightPinned {
+                max-width: calc(100% - 10px);
+            }
+
+            > div.leftPinned.rightPinned {
+                max-width: calc(100% - 20px);
+            }
         }
 
         custom-image-section {
@@ -1555,7 +1563,11 @@
 
         getPinState(pinName) {return this.pins[pinName].state;}
 
-        updatePins() {for (let pin in this.pins) this.pins[pin].element.update();}
+        updatePins() {
+            this.pins.left.state ? this.children[1].classList.add("leftPinned") : this.children[1].classList.remove("leftPinned");
+            this.pins.right.state ? this.children[1].classList.add("rightPinned") : this.children[1].classList.remove("rightPinned");
+            for (let pin in this.pins) this.pins[pin].element.update();
+        }
 
         removePinStrings() {for (let pin in this.pins) if (this.pins[pin].element !== null) this.pins[pin].element.removePinStrings()}
 
@@ -2700,7 +2712,7 @@
                 hasTitle = true;
                 const title = new TextSection();
                 title.text = cardObject.title;
-                title.fontSize.current = 14;
+                title.fontSize.current = 10;
                 title.bold = true;
                 title.pins.left.state = true;
                 title.pins.right.state = true;
@@ -2731,7 +2743,7 @@
                 hasLinkedComment = true;
                 const linkedComment = new TextSection();
                 linkedComment.text = cardObject.comments[0];
-                linkedComment.fontSize.current = 8;
+                linkedComment.fontSize.current = 7;
                 linkedComment.pins.left.state = true;
                 card.sections.push(linkedComment);
             }
@@ -2746,7 +2758,7 @@
                 commentCard.rotate = "0deg";
                 const comment = new TextSection();
                 comment.text = commentText;
-                comment.fontSize.current = 8;
+                comment.fontSize.current = 7;
                 comment.pins.left.state = true;
                 commentCard.sections.push(comment);
                 unlinkedCards[linkedCards.length - 1].push(commentCard);
@@ -2790,10 +2802,13 @@
         for (let i in unlinkedCards) {
             const mainCard = cardSettings.activeCards[i];
             const margin = 5;
-            let y = mainCard.x + mainCard.getBoundingClientRect().height + margin;
+            let y = mainCard.y + mainCard.getBoundingClientRect().height + margin;
+            console.log("!", y);
+            console.log(mainCard.sections[0].text);
 
             for (let card of unlinkedCards[i]) {
                 card.y = y;
+                console.log(y);
                 main.append(card);
                 y += card.getBoundingClientRect().height + margin;
             }
