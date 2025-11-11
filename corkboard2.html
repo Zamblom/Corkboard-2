@@ -638,7 +638,6 @@
                 position: absolute;
                 font-family: sans-serif;
                 font-weight: bold;
-                filter: drop-shadow(0 0 1px black);
             }
             
             > .groupingTextTop {
@@ -658,7 +657,6 @@
                     pointer-events: all;
                     stroke-dasharray: 8px 4px;
                     shape-rendering: crispEdges;
-                    filter: drop-shadow(0 0 1px black);
                 }
             }
         }
@@ -666,6 +664,10 @@
         custom-grouping, custom-grouping-preview {
             position: absolute;
             transform: translate(-50%, -50%);
+
+            div, line{
+                filter: drop-shadow(0 0 1px black);
+            }
         }
 
         custom-grouping {
@@ -868,11 +870,13 @@
         pageSettings.panning = false;
     }
 
-    function handlePan() {
-        if (!pageSettings.panning) return;
+    function handlePan(panning=pageSettings.panning) {
+        if (!panning) return;
 
-        pageSettings.pan.x += event.movementX;
-        pageSettings.pan.y += event.movementY;
+        if (event.type !== "load") {
+            pageSettings.pan.x += event.movementX;
+            pageSettings.pan.y += event.movementY;
+        }
 
         main.style.backgroundPositionX = pageSettings.pan.x + "px";
         main.style.backgroundPositionY = pageSettings.pan.y + "px";
@@ -882,28 +886,40 @@
     }
 
     function handleZoom() {
-        if (event.deltaY < 0) {
-            pageSettings.zoom *= 1.1;
-            pageSettings.zoom = Math.min(4, pageSettings.zoom);
-        } else if (event.deltaY > 0) {
-            pageSettings.zoom /= 1.1;
-            pageSettings.zoom = Math.max(0.2, pageSettings.zoom);
-        }
-        
-        // Don't ask about the exponents, please.
-        main.style.backgroundSize = (pageSettings.zoom**0.9 * 1024) + "px " + (pageSettings.zoom**0.85 * 1024) + "px";
+        function zoomAroundCursor(mouseX, mouseY, panX, panY, zoom, zoomIn) {
+            const zoomStep = 1.1;         // zoom multiplier per step
+            const minZoom = 0.25;
+            const maxZoom = 8;
 
+            const newZoom = Math.min(
+                maxZoom,
+                Math.max(minZoom, zoom * (zoomIn ? zoomStep : 1 / zoomStep))
+            );
+
+            // Adjust pan so the cursor stays fixed relative to the image
+            const newPanX = mouseX - (mouseX - panX) * (newZoom / zoom);
+            const newPanY = mouseY - (mouseY - panY) * (newZoom / zoom);
+
+            return { panX: newPanX, panY: newPanY, zoom: newZoom };
+        }
+        const res = zoomAroundCursor(event.clientX, event.clientY, pageSettings.pan.x, pageSettings.pan.y, pageSettings.zoom, event.deltaY < 0);
+
+        main.style.backgroundPosition = `${res.panX}px ${res.panY}px`;
+        main.style.backgroundSize = `${res.zoom * 100}% auto`;
+
+        pageSettings.pan.x = res.panX;
+        pageSettings.pan.y = res.panY;
+        pageSettings.zoom = res.zoom;
+        
         updateCards();
         updateGroupings();
+        [...document.getElementsByTagName("custom-card-preview")].forEach((el) => {el.followMouse()});
     }
 
     function resetPan() {
         pageSettings.pan.x = 0;
         pageSettings.pan.y = 0;
-        const tmpPanning = pageSettings.panning;
-        pageSettings.panning = true;
-        handlePan();
-        pageSettings.panning = tmpPanning;
+        handlePan(true);
     }
 
     function resetZoom() {
@@ -1257,6 +1273,8 @@
         }
 
         followMouse = () => {
+            this.style.transform = `translate(-50%, -50%) scale(${1.1 * pageSettings.zoom})`;
+
             moveElementToMouse(this);
             this.sections.forEach(section => section.updatePinStrings());
 
@@ -2802,17 +2820,19 @@
         for (let i in unlinkedCards) {
             const mainCard = cardSettings.activeCards[i];
             const margin = 5;
-            let y = mainCard.y + mainCard.getBoundingClientRect().height + margin;
+            let y = mainCard.y + mainCard.getBoundingClientRect().height / 2 + margin;
             console.log("!", y);
             console.log(mainCard.sections[0].text);
 
             for (let card of unlinkedCards[i]) {
-                card.y = y;
-                console.log(y);
                 main.append(card);
-                y += card.getBoundingClientRect().height + margin;
+                const bounds = card.getBoundingClientRect();
+                card.y = y + bounds.height / 2;
+                y += bounds.height + margin;
             }
         }
+
+        updateCards();
     }
 
     window.addEventListener("load", loadLocal());
