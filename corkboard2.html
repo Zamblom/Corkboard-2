@@ -307,7 +307,6 @@
             > div {
                 flex-grow: 1;
                 vertical-align: middle;
-                max-width: calc(100% - 20px);
             }
         }
 
@@ -631,6 +630,7 @@
                 position: absolute;
                 font-family: sans-serif;
                 font-weight: bold;
+                filter: drop-shadow(0 0 1px black);
             }
             
             > .groupingTextTop {
@@ -650,6 +650,7 @@
                     pointer-events: all;
                     stroke-dasharray: 8px 4px;
                     shape-rendering: crispEdges;
+                    filter: drop-shadow(0 0 1px black);
                 }
             }
         }
@@ -663,7 +664,7 @@
             opacity: 85%;
 
             svg:hover:not(:has(line:hover)) line {
-                filter: var(--hover-grouping-filter);
+                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
             }
 
             line {
@@ -671,23 +672,23 @@
             }
 
             line:hover {
-                filter: var(--hover-grouping-filter);
+                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
             }
 
             line:first-child:hover + line {
-                filter: var(--hover-grouping-filter);
+                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
             }
             
             line:first-child:has(+ line:hover) {
-                filter: var(--hover-grouping-filter);
+                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
             }
 
             line:hover + line:last-child {
-                filter: var(--hover-grouping-filter);
+                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
             }
 
             line:has(+ line:last-child:hover) {
-                filter: var(--hover-grouping-filter);
+                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
             }
 
             line:nth-child(1), line:nth-child(2), line:nth-child(5), line:nth-child(6) {
@@ -1554,7 +1555,7 @@
 
         getPinState(pinName) {return this.pins[pinName].state;}
 
-        updatePins() {for (let pin in this.pins) this.pins[pin].element.update()}
+        updatePins() {for (let pin in this.pins) this.pins[pin].element.update();}
 
         removePinStrings() {for (let pin in this.pins) if (this.pins[pin].element !== null) this.pins[pin].element.removePinStrings()}
 
@@ -2795,7 +2796,7 @@
                 card.y = y;
                 main.append(card);
                 y += card.getBoundingClientRect().height + margin;
-            }            
+            }
         }
     }
 
