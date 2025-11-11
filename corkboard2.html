@@ -737,8 +737,7 @@
         <button id="trash">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="#555555"><path d="m376-300 104-104 104 104 56-56-104-104 104-104-56-56-104 104-104-104-56 56 104 104-104 104 56 56Zm-96 180q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520Zm-400 0v520-520Z"/></svg>
         </button>
-        <button onclick="resetPan()">Recentre</button>
-        <button onclick="resetZoom()">Rezoom</button>
+        <button onclick="recenter()">Recentre</button>
         <button onclick="clearWithConfirm()">Clear</button>
         <button onclick="saveLocalWithConfirm()">Save</button>
         <button onclick="loadLocalWithConfirm()">Load</button>
@@ -916,14 +915,11 @@
         [...document.getElementsByTagName("custom-card-preview")].forEach((el) => {el.followMouse()});
     }
 
-    function resetPan() {
+    function recenter() {
         pageSettings.pan.x = 0;
         pageSettings.pan.y = 0;
-        handlePan(true);
-    }
-
-    function resetZoom() {
         pageSettings.zoom = 1;
+        handlePan(true);
         handleZoom();
     }
 </script>
@@ -2840,4 +2836,6 @@
     window.addEventListener("resize", closeCardEditor);
     window.addEventListener("resize", closeGroupingEditor);
 </script>
+<!-- TODO: Fix Snap to Mouse -->
+<!-- TODO: Select Multiple / Pan on Middle Mouse -->
 </html>
