@@ -1336,7 +1336,9 @@
             this.addEventListener("mousedown", () => {
                 if (event.buttons & ~1) return;
                 const bounds = this.getBoundingClientRect();
-                const newCard = new CardPreview(this.size, event.clientX - bounds.x + bounds.width / 2, event.clientY - bounds.y + bounds.height / 2, [...this.sections].map(section => section.clone()));
+                const cursorOffsetX = event.clientX - (bounds.x + bounds.width / 2);
+                const cursorOffsetY = event.clientY - (bounds.y + bounds.height / 2);
+                const newCard = new CardPreview(this.size, cursorOffsetX, cursorOffsetY, [...this.sections].map(section => section.clone()));
                 document.body.append(newCard);
                 newCard.followMouse();
             });
