@@ -34,11 +34,12 @@
 
         main {
             background-image: url("Corkboard Texture.png");
-            background-size: 1024px;
+            background-size: 50% auto;
             height: 100%;
             width: 100%;
             overflow: hidden;
             z-index: 0;
+            filter: saturate(80%);
         }
 
         #controls {
@@ -159,6 +160,10 @@
                     rotate: 0deg;
                     width: 80%;
                 }
+            }
+            
+            > #cardStoreToggle:hover {
+                background-color: rgb(221, 227, 233);
             }
         }
     </style>
@@ -862,6 +867,8 @@
     const main = document.getElementById("main");
 
     function handlePanStart() {
+        console.log(event);
+        if (event.buttons & ~4 && ((event.buttons & ~1) || !event.shiftKey)) return;
         pageSettings.panning = true;
     }
 
@@ -904,7 +911,7 @@
         const res = zoomAroundCursor(event.clientX, event.clientY, pageSettings.pan.x, pageSettings.pan.y, pageSettings.zoom, event.deltaY < 0);
 
         main.style.backgroundPosition = `${res.panX}px ${res.panY}px`;
-        main.style.backgroundSize = `${res.zoom * 100}% auto`;
+        main.style.backgroundSize = `${res.zoom * 50}% auto`;
 
         pageSettings.pan.x = res.panX;
         pageSettings.pan.y = res.panY;
@@ -1243,10 +1250,12 @@
     }
 
     class CardPreview extends CardBase {        
-        constructor(size, sections=[]) {
+        constructor(size, cursorOffsetX, cursorOffsetY, sections=[]) {
             super(size, sections);
             this.fallbackX = null;
             this.fallbackY = null;
+            this.cursorOffsetX = cursorOffsetX;
+            this.cursorOffsetY = cursorOffsetY;
         }
 
         connectedCallback() {
@@ -1271,7 +1280,7 @@
         followMouse = () => {
             this.style.transform = `translate(-50%, -50%) scale(${1.1 * pageSettings.zoom})`;
 
-            moveElementToMouse(this);
+            moveElementToMouse(this, -this.cursorOffsetX, -this.cursorOffsetY);
             this.sections.forEach(section => section.updatePinStrings());
 
             const elementsUnder = document.elementsFromPoint(event.clientX, event.clientY);
@@ -1305,8 +1314,8 @@
             } else if (elementsUnder.filter(x => x.tagName.toUpperCase() === "ASIDE").length === 0) {
                 // Placed
                 // Transform mouse coords to board coords
-                newCard.x = (event.clientX - pageSettings.pan.x) / pageSettings.zoom;
-                newCard.y = (event.clientY - pageSettings.pan.y - this.getBoundingClientRect().height) / pageSettings.zoom;
+                newCard.x = (event.clientX - this.cursorOffsetX - pageSettings.pan.x) / pageSettings.zoom;
+                newCard.y = (event.clientY - this.cursorOffsetY - pageSettings.pan.y - this.getBoundingClientRect().height) / pageSettings.zoom;
             } else {
                 // Rejected
                 if (this.fallbackX === null || this.fallbackY === null) return;
@@ -1325,7 +1334,9 @@
 
         connectedCallback() {
             this.addEventListener("mousedown", () => {
-                const newCard = new CardPreview(this.size, [...this.sections].map(section => section.clone()));
+                if (event.buttons & ~1) return;
+                const bounds = this.getBoundingClientRect();
+                const newCard = new CardPreview(this.size, event.clientX - bounds.x + bounds.width / 2, event.clientY - bounds.y + bounds.height / 2, [...this.sections].map(section => section.clone()));
                 document.body.append(newCard);
                 newCard.followMouse();
             });
@@ -1394,7 +1405,7 @@
         }
 
         handleMousedown = () => {
-            if (!(event.buttons & 1)) return;
+            if (event.buttons & ~1) return;
             event.stopPropagation();
             if (cardEditorSettings.card !== this) closeCardEditor();
 
@@ -1414,7 +1425,11 @@
         }
 
         becomePicked = () => {
-            const pickedCard = new CardPreview(this.size, this.sections);
+            const bounds = this.getBoundingClientRect();
+            const cursorOffsetX = event.clientX - (bounds.x + bounds.width / 2);
+            const cursorOffsetY = event.clientY - (bounds.y + bounds.height / 2);
+            console.log(event.clientX, event.clientY, bounds, cursorOffsetX, cursorOffsetY);
+            const pickedCard = new CardPreview(this.size, cursorOffsetX, cursorOffsetY, this.sections);
             main.append(pickedCard);
             pickedCard.fallbackX = this.x;
             pickedCard.fallbackY = this.y;
@@ -2266,7 +2281,7 @@
         }
 
         handleMouseDown = () => {
-            if (!(event.buttons | 1)) return;
+            if (event.buttons & ~1) return;
             event.stopPropagation();
 
             const handleMouseMove = () => {
@@ -2294,7 +2309,10 @@
         }
 
         becomePicked() {
-            const preview = new GroupingPreview(this.text.top, this.text.bottom, this.color, this.height, this.width, this.x, this.y);
+            const bounds = this.getBoundingClientRect();
+            const cursorOffsetX = event.clientX - (bounds.x + bounds.width / 2);
+            const cursorOffsetY = event.clientY - (bounds.y + bounds.height / 2);
+            const preview = new GroupingPreview(this.text.top, this.text.bottom, this.color, cursorOffsetX, cursorOffsetY, this.height, this.width, this.x, this.y);
             document.body.append(preview);
             preview.followMouse();
             this.remove();
@@ -2302,6 +2320,7 @@
         }
 
         handleTopMouseDown = () => {
+            if (event.buttons & ~1) return;
             event.stopPropagation();
 
             const initialY = this.y;
@@ -2319,6 +2338,7 @@
         }
 
         handleLeftMouseDown = () => {
+            if (event.buttons & ~1) return;
             event.stopPropagation();
 
             const initialX = this.x;
@@ -2336,6 +2356,7 @@
         }
 
         handleRightMouseDown = () => {
+            if (event.buttons & ~1) return;
             event.stopPropagation();
 
             const initialX = this.x;
@@ -2354,6 +2375,7 @@
         }
 
         handleBottomMouseDown = () => {
+            if (event.buttons & ~1) return;
             event.stopPropagation();
 
             const initialY = this.y;
@@ -2426,11 +2448,13 @@
         fallbackX = null;
         fallbackY = null;
 
-        constructor(topText, bottomText, color, height=70, width=200, fallbackX=null, fallbackY=null) {
+        constructor(topText, bottomText, color, cursorOffsetX, cursorOffsetY, height=70, width=200, fallbackX=null, fallbackY=null) {
             super();
             this.text.top = topText;
             this.text.bottom = bottomText;
             this.color = color;
+            this.cursorOffsetX = cursorOffsetX;
+            this.cursorOffsetY = cursorOffsetY;
             this.originalColor = color;
             this.width = width;
             this.height = height;
@@ -2450,7 +2474,7 @@
         }
 
         followMouse = () => {
-            moveElementToMouse(this);
+            moveElementToMouse(this, -this.cursorOffsetX, -this.cursorOffsetY);
 
             const elementsUnder = document.elementsFromPoint(event.clientX, event.clientY);
 
@@ -2476,8 +2500,8 @@
                 this.remove();
             } else if (elementsUnder.filter(x => x.tagName.toUpperCase() === "ASIDE").length === 0) {
                 // Transform mouse coords to board coords
-                const x = (event.clientX - pageSettings.pan.x) / pageSettings.zoom;
-                const y = (event.clientY - pageSettings.pan.y) / pageSettings.zoom;
+                const x = (event.clientX - this.cursorOffsetX - pageSettings.pan.x) / pageSettings.zoom;
+                const y = (event.clientY - this.cursorOffsetY - pageSettings.pan.y) / pageSettings.zoom;
                 const grouping = new Grouping(this.text.top, this.text.bottom, this.color, x, y, this.width, this.height);
                 main.append(grouping);
                 this.remove();
@@ -2528,7 +2552,11 @@
         }
 
         handleMouseDown = () => {
-            const preview = new GroupingPreview(this.text.top, this.text.bottom, "#fff");
+            if (event.buttons & ~1) return;
+            const bounds = this.getBoundingClientRect();
+            const cursorOffsetX = event.clientX - (bounds.x + bounds.width / 2);
+            const cursorOffsetY = event.clientY - (bounds.y + bounds.height / 2);
+            const preview = new GroupingPreview(this.text.top, this.text.bottom, "#fff", cursorOffsetX, cursorOffsetY);
             document.body.append(preview);
             preview.followMouse();
         }
@@ -2595,9 +2623,9 @@
     window.addEventListener("load", closeGroupingEditor);
 </script>
 <script id="script-utility">
-    function moveElementToMouse(element, mouseEvent=event) {
-        element.style.left = mouseEvent.clientX + "px";
-        element.style.top = mouseEvent.clientY + "px";
+    function moveElementToMouse(element, offsetX=0, offsetY=0, mouseEvent=event) {
+        element.style.left = mouseEvent.clientX + offsetX + "px";
+        element.style.top = mouseEvent.clientY + offsetY + "px";
     }
 
     function save() {
@@ -2836,6 +2864,7 @@
     window.addEventListener("resize", closeCardEditor);
     window.addEventListener("resize", closeGroupingEditor);
 </script>
-<!-- TODO: Fix Snap to Mouse -->
 <!-- TODO: Select Multiple / Pan on Middle Mouse -->
+<!-- TODO: Fix Grouping Hitbox -->
+<!-- TODO: Fix Grouping Pickup Scaling -->
 </html>
