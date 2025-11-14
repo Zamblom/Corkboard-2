@@ -660,6 +660,9 @@
 
                 > line {
                     pointer-events: all;
+                }
+
+                > .line {
                     stroke-dasharray: 8px 4px;
                     shape-rendering: crispEdges;
                 }
@@ -670,7 +673,7 @@
             position: absolute;
             transform: translate(-50%, -50%);
 
-            div, line{
+            div, .line {
                 filter: drop-shadow(0 0 1px black);
             }
         }
@@ -678,45 +681,29 @@
         custom-grouping {
             opacity: 85%;
 
-            svg:hover:not(:has(line:hover)) line {
-                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
-            }
-
-            line {
+            .line {
                 pointer-events: stroke;
             }
 
-            line:hover {
+            .line.hover {
                 filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
             }
 
-            line:first-child:hover + line {
-                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
-            }
-            
-            line:first-child:has(+ line:hover) {
-                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
-            }
-
-            line:hover + line:last-child {
-                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
-            }
-
-            line:has(+ line:last-child:hover) {
-                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
-            }
-
-            line:nth-child(1), line:nth-child(2), line:nth-child(5), line:nth-child(6) {
+            line:nth-child(8), line:nth-child(9), line:nth-child(12), line:nth-child(13) {
                 cursor: ns-resize;
             }
 
-            line:nth-child(3), line:nth-child(4) {
+            line:nth-child(10), line:nth-child(11) {
                 cursor: ew-resize;
             }
-        }
-        
-        custom-grouping:has(> svg:hover):not(:has(line:hover))>div {
-            filter: var(--hover-grouping-filter);
+
+            circle {
+                cursor: move;
+            }
+
+            circle:hover {
+                filter: var(--hover-grouping-filter) drop-shadow(0 0 1px black);
+            }
         }
 
         custom-grouping *::selection, custom-grouping-preview *::selection, custom-grouping-template *::selection {
@@ -853,12 +840,13 @@
         <div class="groupingTextTop"></div>
         <div class="groupingTextBottom"></div>
         <svg>
-            <line class="groupingTop"></line>
-            <line class="groupingTopSecond"></line>
-            <line class="groupingLeft"></line>
-            <line class="groupingRight"></line>
-            <line class="groupingBottom"></line>
-            <line class="groupingBottomSecond"></line>
+            <line class="groupingTop line"></line>
+            <line class="groupingTopSecond line"></line>
+            <line class="groupingLeft line"></line>
+            <line class="groupingRight line"></line>
+            <line class="groupingBottom line"></line>
+            <line class="groupingBottomSecond line"></line>
+            <circle r="0"></circle>
         </svg>
     </template>
     <canvas id="imageResizer" hidden></canvas>
@@ -2132,6 +2120,7 @@
         edgeMargin = 10;
         textMargin = 5;
         strokeWidth = 3;
+        circle = null;
 
         constructor() {
             super();
@@ -2152,6 +2141,8 @@
             this.lines.right = this.getElementsByClassName("groupingRight")[0];
             this.lines.bottom = this.getElementsByClassName("groupingBottom")[0];
             this.lines.bottomSecond = this.getElementsByClassName("groupingBottomSecond")[0];
+
+            this.circle = this.getElementsByTagNameNS('http://www.w3.org/2000/svg', "circle")[0];
 
             this.redraw();
         }
@@ -2217,6 +2208,11 @@
                 this.lines.top.setAttribute("y1", this.edgeMargin);
                 this.lines.top.setAttribute("x2", bounds.width / scaleFactor - this.edgeMargin + this.strokeWidth / 2);
                 this.lines.top.setAttribute("y2", this.edgeMargin);
+                
+                this.lines.topSecond.setAttribute("x1", 0);
+                this.lines.topSecond.setAttribute("y1", 0);
+                this.lines.topSecond.setAttribute("x2", 0);
+                this.lines.topSecond.setAttribute("y2", 0);
             }
 
             if (bottomText) {
@@ -2234,6 +2230,21 @@
                 this.lines.bottom.setAttribute("y1", bounds.height / scaleFactor - this.edgeMargin + this.strokeWidth / 2);
                 this.lines.bottom.setAttribute("x2", bounds.width / scaleFactor - this.edgeMargin + this.strokeWidth / 2);
                 this.lines.bottom.setAttribute("y2", bounds.height / scaleFactor - this.edgeMargin + this.strokeWidth / 2);
+
+                this.lines.bottomSecond.setAttribute("x1", 0);
+                this.lines.bottomSecond.setAttribute("y1", 0);
+                this.lines.bottomSecond.setAttribute("x2", 0);
+                this.lines.bottomSecond.setAttribute("y2", 0);
+            }
+
+            if (!topText && !bottomText) {
+                this.circle.setAttribute("cx", this.edgeMargin);
+                this.circle.setAttribute("cy", this.edgeMargin);
+                this.circle.setAttribute("r", this.strokeWidth * 1.5);
+                this.circle.style.stroke = this.color;
+                this.circle.style.fill = this.color;
+            } else {
+                this.circle.setAttribute("r", 0);
             }
             
             this.lines.left.setAttribute("x1", this.edgeMargin);
@@ -2249,6 +2260,16 @@
     }
 
     class Grouping extends GroupingBase {
+        hitStrokeWidth = 10;
+        hitLines = {
+            top: document.createElementNS('http://www.w3.org/2000/svg','line'),
+            topSecond: document.createElementNS('http://www.w3.org/2000/svg','line'),
+            left: document.createElementNS('http://www.w3.org/2000/svg','line'),
+            right: document.createElementNS('http://www.w3.org/2000/svg','line'),
+            bottom: document.createElementNS('http://www.w3.org/2000/svg','line'),
+            bottomSecond: document.createElementNS('http://www.w3.org/2000/svg','line'),
+        };
+
         constructor(topText, bottomText, color, x, y, width, height) {
             super();
             this.text.top = topText;
@@ -2267,21 +2288,34 @@
             super.connectedCallback();
             groupingSettings.activeGroupings.push(this);
 
-            this.children[0].addEventListener("mousedown", this.handleMouseDown);
-            this.children[1].addEventListener("mousedown", this.handleMouseDown);
-            this.children[2].addEventListener("mousedown", this.handleMouseDown);
+            for (let hitLine in this.hitLines) {
+                this.hitLines[hitLine].classList.add("hitLine")
+                this.hitLines[hitLine].setAttribute("stroke-width", 12);
+                this.children[2].append(this.hitLines[hitLine]);
+            }
 
-            this.children[2].children[0].addEventListener("mousedown", this.handleTopMouseDown);
-            this.children[2].children[1].addEventListener("mousedown", this.handleTopMouseDown);
-            this.children[2].children[2].addEventListener("mousedown", this.handleLeftMouseDown);
-            this.children[2].children[3].addEventListener("mousedown", this.handleRightMouseDown);
-            this.children[2].children[4].addEventListener("mousedown", this.handleBottomMouseDown);
-            this.children[2].children[5].addEventListener("mousedown", this.handleBottomMouseDown);
+            this.text.topElement.addEventListener("mousedown", this.handleMouseDown);
+            this.text.bottomElement.addEventListener("mousedown", this.handleMouseDown);
+            this.circle.addEventListener("mousedown", this.handleMouseDown);
 
-            this.children[0].addEventListener("mouseenter", this.handleMouseEnter);
-            this.children[0].addEventListener("mouseleave", this.handleMouseLeave);
-            this.children[1].addEventListener("mouseenter", this.handleMouseEnter);
-            this.children[1].addEventListener("mouseleave", this.handleMouseLeave);
+            this.hitLines.top.addEventListener("mousedown", this.handleTopMouseDown);
+            this.hitLines.topSecond.addEventListener("mousedown", this.handleTopMouseDown);
+            this.hitLines.left.addEventListener("mousedown", this.handleLeftMouseDown);
+            this.hitLines.right.addEventListener("mousedown", this.handleRightMouseDown);
+            this.hitLines.bottom.addEventListener("mousedown", this.handleBottomMouseDown);
+            this.hitLines.bottomSecond.addEventListener("mousedown", this.handleBottomMouseDown);
+
+            this.hitLines.top.addEventListener("mouseenter", this.handleTopMouseEnter);
+            this.hitLines.topSecond.addEventListener("mouseenter", this.handleTopSecondMouseEnter);
+            this.hitLines.left.addEventListener("mouseenter", this.handleLeftMouseEnter);
+            this.hitLines.right.addEventListener("mouseenter", this.handleRightMouseEnter);
+            this.hitLines.bottom.addEventListener("mouseenter", this.handleBottomMouseEnter);
+            this.hitLines.bottomSecond.addEventListener("mouseenter", this.handleBottomSecondMouseEnter);
+
+            this.text.topElement.addEventListener("mouseenter", this.handleMouseEnter);
+            this.text.topElement.addEventListener("mouseleave", this.handleMouseLeave);
+            this.text.bottomElement.addEventListener("mouseenter", this.handleMouseEnter);
+            this.text.bottomElement.addEventListener("mouseleave", this.handleMouseLeave);
 
             this.updatePosition();
         }
@@ -2403,6 +2437,56 @@
             window.addEventListener("mouseup", () => {window.removeEventListener("mousemove", handleBottomMouseMove), {once: true}});
         }
 
+        handleTopMouseEnter = () => {
+            this.lines.top.classList.add("hover");
+            this.lines.topSecond.classList.add("hover");
+            this.hitLines.top.addEventListener("mouseleave", () => {
+                this.lines.top.classList.remove("hover");
+                this.lines.topSecond.classList.remove("hover");
+            }, {once: true});
+        }
+
+        handleTopSecondMouseEnter = () => {
+            this.lines.top.classList.add("hover");
+            this.lines.topSecond.classList.add("hover");
+            this.hitLines.topSecond.addEventListener("mouseleave", () => {
+                this.lines.top.classList.remove("hover");
+                this.lines.topSecond.classList.remove("hover");
+            }, {once: true});
+        }
+        
+        handleLeftMouseEnter = () => {
+            this.lines.left.classList.add("hover");
+            this.hitLines.left.addEventListener("mouseleave", () => {
+                this.lines.left.classList.remove("hover");
+            }, {once: true});
+        }
+        
+        handleRightMouseEnter = () => {
+            this.lines.right.classList.add("hover");
+            this.hitLines.right.addEventListener("mouseleave", () => {
+                this.lines.right.classList.remove("hover");
+            }, {once: true});
+        }
+        
+        handleBottomMouseEnter = () => {
+            this.lines.bottom.classList.add("hover");
+            this.lines.bottomSecond.classList.add("hover");
+            this.hitLines.bottom.addEventListener("mouseleave", () => {
+                this.lines.bottom.classList.remove("hover");
+                this.lines.bottomSecond.classList.remove("hover");
+            }, {once: true});
+        }
+
+        handleBottomSecondMouseEnter = () => {
+            this.lines.bottom.classList.add("hover");
+            this.lines.bottomSecond.classList.add("hover");
+            this.hitLines.bottomSecond.addEventListener("mouseleave", () => {
+                this.lines.bottom.classList.remove("hover");
+                this.lines.bottomSecond.classList.remove("hover");
+            }, {once: true});
+        }
+
         setTopText(newTopText) {
             this.text.top = newTopText;
             this.updatePosition();
@@ -2426,6 +2510,17 @@
             this.redraw(pageSettings.zoom);
         }
     
+        redraw(scaleFactor) {
+            super.redraw(scaleFactor);
+            
+            for (let line in this.lines) {
+                this.hitLines[line].setAttribute("x1", this.lines[line].getAttribute("x1"));
+                this.hitLines[line].setAttribute("y1", this.lines[line].getAttribute("y1"));
+                this.hitLines[line].setAttribute("x2", this.lines[line].getAttribute("x2"));
+                this.hitLines[line].setAttribute("y2", this.lines[line].getAttribute("y2"));
+            }
+        }
+
         save() {
             return {
                 text: {
@@ -2499,8 +2594,8 @@
                 this.color = "orange";
             }
             
-            this.style.transform = "translate(-50%, -50%) scale(" + pageSettings.zoom * 1.1 + ")";
-            this.redraw(pageSettings.zoom * 1.1);
+            this.style.transform = "translate(-50%, -50%) scale(" + pageSettings.zoom * 1.02 + ")";
+            this.redraw(pageSettings.zoom * 1.02);
         }
 
         place = () => {
@@ -2902,8 +2997,6 @@
             y2: Math.max(event.clientY, cardMultiSelectSettings.y),
         };
 
-        console.log("Pick Test");
-        console.log(coords);
         cardSettings.activeCards.filter(card => {
             const bounds = card.getBoundingClientRect();
             const leftEdge = bounds.x;
@@ -2926,11 +3019,8 @@
     }
 
     main.addEventListener("mousedown", () => {
-        console.log("Pick Start");
         if (event.buttons & ~1 || event.shiftKey) return;
-        console.log("Pick Pass");
         if (document.getElementsByTagName("custom-card-preview").length > 0) return;
-        console.log("Pick Valid");
 
         window.addEventListener("mousemove", beginMultiSelect, {once: true});
         window.addEventListener("mouseup", () => {window.removeEventListener("mousemove", beginMultiSelect)}, {once: true});
@@ -2950,7 +3040,6 @@
         window.addEventListener("mouseup", selectMultiple);
 
         window.addEventListener("contextmenu", () => {
-            console.log("Pick Cancel")
             event.preventDefault();
             multiSelectBox.hidden = true;
             window.removeEventListener("mousemove", updateMultiSelectBox);
@@ -2959,5 +3048,4 @@
         });
     }
 </script>
-<!-- TODO: Fix Grouping Hitbox -->
 </html>
