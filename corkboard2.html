@@ -2954,13 +2954,13 @@
         for (let i in unlinkedCards) {
             const mainCard = cardSettings.activeCards[i];
             const margin = 5;
-            let y = mainCard.y + mainCard.getBoundingClientRect().height / 2 + margin;
+            let y = mainCard.y + mainCard.getBoundingClientRect().height / 2 / pageSettings.zoom + margin;
 
             for (let card of unlinkedCards[i]) {
                 main.append(card);
                 const bounds = card.getBoundingClientRect();
-                card.y = y + bounds.height / 2;
-                y += bounds.height + margin;
+                card.y = y + bounds.height / 2 / pageSettings.zoom;
+                y += bounds.height / pageSettings.zoom + margin;
             }
         }
 
