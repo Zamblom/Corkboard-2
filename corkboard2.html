@@ -733,6 +733,13 @@
             height: 80%;
         }
     </style>
+    <style id="style-multiSelect">
+        #multiSelectBox {
+            position: absolute;
+            background-color: #77bbff50;
+            z-index: 40;
+        }
+    </style>
 </head>
 <body>
     <main id="main" onmousedown="handlePanStart()" onmouseup="handlePanEnd()" onmouseleave="handlePanEnd()" onmousemove="handlePan()" onwheel="handleZoom()">
@@ -855,6 +862,7 @@
         </svg>
     </template>
     <canvas id="imageResizer" hidden></canvas>
+    <div id="multiSelectBox" hidden></div>
 </body>
 <script id="script-pageNavigation">
     var pageSettings = {
@@ -867,7 +875,6 @@
     const main = document.getElementById("main");
 
     function handlePanStart() {
-        console.log(event);
         if (event.buttons & ~4 && ((event.buttons & ~1) || !event.shiftKey)) return;
         pageSettings.panning = true;
     }
@@ -920,6 +927,7 @@
         updateCards();
         updateGroupings();
         [...document.getElementsByTagName("custom-card-preview")].forEach((el) => {el.followMouse()});
+        [...document.getElementsByTagName("custom-grouping-preview")].forEach((el) => {el.followMouse()});
     }
 
     function recenter() {
@@ -1430,7 +1438,6 @@
             const bounds = this.getBoundingClientRect();
             const cursorOffsetX = event.clientX - (bounds.x + bounds.width / 2);
             const cursorOffsetY = event.clientY - (bounds.y + bounds.height / 2);
-            console.log(event.clientX, event.clientY, bounds, cursorOffsetX, cursorOffsetY);
             const pickedCard = new CardPreview(this.size, cursorOffsetX, cursorOffsetY, this.sections);
             main.append(pickedCard);
             pickedCard.fallbackX = this.x;
@@ -1440,8 +1447,9 @@
         }
 
         updatePosition() {
-            this.style.left = this.x * pageSettings.zoom + pageSettings.pan.x + "px";
-            this.style.top = this.y * pageSettings.zoom + pageSettings.pan.y + "px";
+            const screenCoords = mainToScreenCoords(this.x, this.y);
+            this.style.left = screenCoords.x + "px";
+            this.style.top = screenCoords.y + "px";
             this.style.transform = "translate(-50%, -50%) scale(" + pageSettings.zoom + ")";
 
             this.sections.forEach(section => section.updatePinStrings());
@@ -2097,6 +2105,7 @@
     }
 
     window.addEventListener("load", closeCardEditor);
+    window.addEventListener("resize", closeCardEditor);
 </script>
 <script id="script-grouping">
     var groupingSettings = {
@@ -2410,8 +2419,9 @@
         }
 
         updatePosition() {
-            this.style.left = this.x * pageSettings.zoom + pageSettings.pan.x + "px";
-            this.style.top = this.y * pageSettings.zoom + pageSettings.pan.y + "px";
+            const screenCoords = mainToScreenCoords(this.x, this.y);
+            this.style.left = screenCoords.x + "px";
+            this.style.top = screenCoords.y + "px";
             this.style.transform = "translate(-50%, -50%) scale(" + pageSettings.zoom + ")";
             this.redraw(pageSettings.zoom);
         }
@@ -2488,8 +2498,9 @@
             } else {
                 this.color = "orange";
             }
-
-            this.redraw();
+            
+            this.style.transform = "translate(-50%, -50%) scale(" + pageSettings.zoom * 1.1 + ")";
+            this.redraw(pageSettings.zoom * 1.1);
         }
 
         place = () => {
@@ -2517,14 +2528,6 @@
                     this.remove();
                 }
             }
-        }
-
-        redraw = () => {
-            this.children[2].style.width =  this.width + "px";
-            this.children[2].style.height = this.height + "px";
-            this.style.width = this.width * pageSettings.zoom + "px";
-            this.style.height = this.height * pageSettings.zoom + "px";
-            super.redraw();
         }
     }
     customElements.define("custom-grouping-preview", GroupingPreview);
@@ -2578,11 +2581,6 @@
     customElements.define("custom-grouping-template", GroupingTemplate);
     
     function updateGroupings() {groupingSettings.activeGroupings.forEach(grouping => {grouping.updatePosition()})}
-
-    // window.addEventListener("load", () => {
-    //     const storeGrouping = document.getElementById("storeGrouping").children[0];
-    //     storeGrouping.setTopText("Grouping");
-    // });
 </script>
 <script id="script-groupingEditor">
     var groupingEditorSettings = {
@@ -2623,6 +2621,7 @@
     }
 
     window.addEventListener("load", closeGroupingEditor);
+    window.addEventListener("resize", closeGroupingEditor);
 </script>
 <script id="script-utility">
     function moveElementToMouse(element, offsetX=0, offsetY=0, mouseEvent=event) {
@@ -2630,6 +2629,22 @@
         element.style.top = mouseEvent.clientY + offsetY + "px";
     }
 
+    function mainToScreenCoords(x, y) {
+        return {
+            x: x * pageSettings.zoom + pageSettings.pan.x,
+            y: y * pageSettings.zoom + pageSettings.pan.y,
+        };
+    }
+
+    function screenToMainCoords(x, y) {
+        return {
+            x: (x - pageSettings.pan.x) / pageSettings.zoom,
+            y: (y - pageSettings.pan.y) / pageSettings.zoom,
+        };
+    }
+
+</script>
+<script id="script-save">
     function save() {
         const saveObject = {
             version: 1,
@@ -2714,7 +2729,6 @@
         loadInput.type = "file";
         loadInput.accept = ".board,.board2";
         loadInput.addEventListener("input", () => {
-            console.log();
             const reader = new FileReader();
             reader.addEventListener("load", () => {
                 switch (loadInput.files[0].name.split(".")[1]) {
@@ -2735,7 +2749,6 @@
 
     function load_board(saveString) {
         const saveObject = JSON.parse(saveString);
-        console.log(saveObject);
 
         const linkedCards = [];
         const unlinkedCards = {};
@@ -2847,8 +2860,6 @@
             const mainCard = cardSettings.activeCards[i];
             const margin = 5;
             let y = mainCard.y + mainCard.getBoundingClientRect().height / 2 + margin;
-            console.log("!", y);
-            console.log(mainCard.sections[0].text);
 
             for (let card of unlinkedCards[i]) {
                 main.append(card);
@@ -2861,12 +2872,92 @@
         updateCards();
     }
 
-    window.addEventListener("load", loadLocal());
-
-    window.addEventListener("resize", closeCardEditor);
-    window.addEventListener("resize", closeGroupingEditor);
+    window.addEventListener("load", loadLocal);
 </script>
-<!-- TODO: Select Multiple / Pan on Middle Mouse -->
+<script id="script-card-multiselect">
+    var cardMultiSelectSettings = {
+        x: null,
+        y: null,
+    };
+
+    const multiSelectBox = document.getElementById("multiSelectBox");
+
+    function updateMultiSelectBox() {
+        multiSelectBox.style.left = Math.min(event.clientX, cardMultiSelectSettings.x) + "px";
+        multiSelectBox.style.top = Math.min(event.clientY, cardMultiSelectSettings.y) + "px";
+        multiSelectBox.style.width = Math.abs(event.clientX - cardMultiSelectSettings.x) + "px";
+        multiSelectBox.style.height = Math.abs(event.clientY - cardMultiSelectSettings.y) + "px";
+    }
+
+    function selectMultiple() {
+        if (event.button > 1) return;
+        window.removeEventListener("mousemove", updateMultiSelectBox);
+        window.removeEventListener("mouseup", selectMultiple);
+        multiSelectBox.hidden = true;
+
+        const coords = {
+            x1: Math.min(event.clientX, cardMultiSelectSettings.x),
+            y1: Math.min(event.clientY, cardMultiSelectSettings.y),
+            x2: Math.max(event.clientX, cardMultiSelectSettings.x),
+            y2: Math.max(event.clientY, cardMultiSelectSettings.y),
+        };
+
+        console.log("Pick Test");
+        console.log(coords);
+        cardSettings.activeCards.filter(card => {
+            const bounds = card.getBoundingClientRect();
+            const leftEdge = bounds.x;
+            const rightEdge = bounds.x + bounds.width;
+            const topEdge = bounds.y;
+            const bottomEdge = bounds.y + bounds.height;
+            if (leftEdge > coords.x2) return false;
+            if (rightEdge < coords.x1) return false;
+            if (topEdge > coords.y2) return false;
+            if (bottomEdge < coords.y1) return false;
+            return true;
+        }).forEach(card => card.becomePicked());
+
+        cardMultiSelectSettings.x = 0;
+        cardMultiSelectSettings.y = 0;
+        multiSelectBox.style.left = 0;
+        multiSelectBox.style.top = 0;
+        multiSelectBox.style.width = 0;
+        multiSelectBox.style.height = 0;
+    }
+
+    main.addEventListener("mousedown", () => {
+        console.log("Pick Start");
+        if (event.buttons & ~1 || event.shiftKey) return;
+        console.log("Pick Pass");
+        if (document.getElementsByTagName("custom-card-preview").length > 0) return;
+        console.log("Pick Valid");
+
+        window.addEventListener("mousemove", beginMultiSelect, {once: true});
+        window.addEventListener("mouseup", () => {window.removeEventListener("mousemove", beginMultiSelect)}, {once: true});
+    });
+
+    function beginMultiSelect() {
+        cardMultiSelectSettings.x = event.clientX;
+        cardMultiSelectSettings.y = event.clientY;
+
+        multiSelectBox.hidden = false;
+        multiSelectBox.style.left = cardMultiSelectSettings.x + "px";
+        multiSelectBox.style.top = cardMultiSelectSettings.y + "px";
+        multiSelectBox.style.width = "0px";
+        multiSelectBox.style.height = "0px";
+
+        window.addEventListener("mousemove", updateMultiSelectBox);
+        window.addEventListener("mouseup", selectMultiple);
+
+        window.addEventListener("contextmenu", () => {
+            console.log("Pick Cancel")
+            event.preventDefault();
+            multiSelectBox.hidden = true;
+            window.removeEventListener("mousemove", updateMultiSelectBox);
+            window.removeEventListener("mouseup", selectMultiple);
+            return false;
+        });
+    }
+</script>
 <!-- TODO: Fix Grouping Hitbox -->
-<!-- TODO: Fix Grouping Pickup Scaling -->
 </html>
