@@ -2929,10 +2929,14 @@
         for (let i in saveObject) {
             const cardObject = saveObject[i];
             if (cardObject.connections === undefined) continue;
-            
+            if (activeCards[parseInt(i)] === null || activeCards[parseInt(i)] === undefined) {
+                console.log("Tried to draw a connection from a non-existent card.");
+                continue;
+            }
+                
             for (let c of cardObject.connections) {
                 const iTopSection = cardSettings.activeCards[parseInt(i)].sections[0];
-                if (cardSettings.activeCards[c] === null) {
+                if (cardSettings.activeCards[c] === null || cardSettings.activeCards[c] === undefined) {
                     console.log("Tried to draw a connection to a non-existent card.");
                     continue;
                 }
