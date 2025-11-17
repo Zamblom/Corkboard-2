@@ -2892,6 +2892,9 @@
             let hasLinkedComment = false;
 
             if (!hasTitle && !hasImage && !hasCaption) {
+                // Catch and remove cards with no title, image, caption, or comments.
+                if (cardObject.comments === undefined) continue;
+                
                 hasLinkedComment = true;
                 const linkedComment = new TextSection();
                 linkedComment.text = cardObject.comments[0];
